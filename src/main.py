@@ -35,10 +35,46 @@ from rich.table import Table
 from src.parser import (
     parse_all,
     get_stats_from_parsed,
+    detect_export_type,
+    load_conversations,
+    ExportType,
 )
 from src.chunker import chunk_conversations, DEFAULT_CHUNK_SIZE
 from src.providers import LocalProvider, APIProvider, LLMProvider
 from src.extractor import extract_chunk
+
+
+# Supported export types
+SUPPORTED_EXPORTS = {"chatgpt"}
+
+
+def is_supported_export(export_type: ExportType) -> bool:
+    """Check if an export type is currently supported."""
+    return export_type in SUPPORTED_EXPORTS
+
+
+def get_coming_soon_message(export_type: ExportType) -> str:
+    """
+    Get a friendly message for unsupported export types.
+
+    Args:
+        export_type: The detected export type
+
+    Returns:
+        User-friendly message explaining support status
+    """
+    if export_type == "claude":
+        return (
+            "Claude exports are coming soon!\n"
+            "Currently supported: ChatGPT\n"
+            "Claude support is on the roadmap."
+        )
+    else:
+        return (
+            "Export format not recognized.\n"
+            "Currently supported: ChatGPT\n"
+            "More formats coming soon!"
+        )
 
 # Constants
 DEFAULT_INPUT_PATH = "conversations.json"

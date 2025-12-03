@@ -10,9 +10,44 @@ Stage 2:
 """
 
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from dataclasses import dataclass
 from pathlib import Path
+
+
+ExportType = Literal["chatgpt", "claude", "unknown"]
+
+
+def detect_export_type(data: List[Dict[str, Any]]) -> ExportType:
+    """
+    Auto-detect which LLM service created this export.
+
+    Detection logic:
+    - ChatGPT: has 'mapping' field with tree structure
+    - Claude: has 'uuid' and 'chat_messages' fields
+    - Unknown: neither pattern matches
+
+    Args:
+        data: Parsed JSON data (list of conversation objects)
+
+    Returns:
+        "chatgpt", "claude", or "unknown"
+    """
+    if not data or not isinstance(data, list):
+        return "unknown"
+
+    # Check first conversation for distinctive fields
+    first = data[0]
+
+    # ChatGPT: has 'mapping' field (tree structure)
+    if "mapping" in first and isinstance(first.get("mapping"), dict):
+        return "chatgpt"
+
+    # Claude: has 'uuid' and 'chat_messages' (flat array)
+    if "uuid" in first and "chat_messages" in first:
+        return "claude"
+
+    return "unknown"
 
 
 @dataclass

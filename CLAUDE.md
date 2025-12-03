@@ -19,9 +19,10 @@ conversations.json → Parse → Chunk(65536) → Extract(LLM) → Verify → Ag
 | 6 Dedup | Yes | Semantic dedup; prefer newer > specific > frequent |
 | 7 Distill | Yes | Compress to final categorized profile |
 
-## conversations.json Structure
+## Export Formats
 
-**Top level:** Array of conversation objects
+### ChatGPT Export
+Single `conversations.json` file.
 
 **Conversation:**
 | Field | Type | Notes |
@@ -50,6 +51,33 @@ conversations.json → Parse → Chunk(65536) → Extract(LLM) → Verify → Ag
 | multimodal_text | `{ parts: [image_asset_pointer, "text"] }` |
 | code | `{ language, text }` |
 | execution_output | `{ text }` — from tool |
+
+**Free wins:** `user_editable_context` only (custom instructions, no memories)
+
+### Claude Export
+Folder `data-{timestamp}-batch-{N}/` with 4 files:
+- `conversations.json` — flat message arrays
+- `memories.json` — **rich memories!** conversation + project memories
+- `projects.json` — project definitions with docs
+- `users.json` — user profile
+
+| Field | Type | Notes |
+|-------|------|-------|
+| uuid | UUID | Primary key (not `id`) |
+| name | string | Title (not `title`) |
+| created_at / updated_at | ISO 8601 | String timestamps (not float) |
+| chat_messages | array | Flat list (not tree) |
+
+**Message:** `sender` = `human`/`assistant`, `content[]` array with `type` = `text`/`thinking`
+
+**Free wins:** `memories.json` contains `conversations_memory` + `project_memories` — much richer than ChatGPT!
+
+### Auto-Detection Logic
+```
+has "mapping" field → ChatGPT
+has "uuid" + "chat_messages" → Claude
+otherwise → unknown
+```
 
 ## Key Patterns
 
