@@ -1,123 +1,134 @@
 """
 main.py - CLI entry point
 
-Interactive menu for:
-- Input file selection
-- Extraction depth (quick/medium/full)
-- LLM provider (local/API)
-- Chunk size (default 65536)
-- Output format (md/json/both)
+Stage 1: CLI Shell
+- Show banner
+- Accept input file (default: conversations.json)
+- Validate file exists
+- Show file stats
+- Exit cleanly
 """
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
-# from rich.console import Console
-# from rich.prompt import Prompt, Confirm
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
 
-# from .parser import parse_all
-# from .chunker import chunk_conversations
-# from .extractor import extract_all
-# from .verifier import verify_all
-# from .aggregator import aggregate
-# from .deduplicator import deduplicate
-# from .distiller import distill
-# from .providers import LocalProvider, APIProvider
+# Constants
+DEFAULT_INPUT_PATH = "conversations.json"
+
+
+@dataclass
+class ValidationResult:
+    """Result of validating an input file."""
+    valid: bool
+    size_bytes: int
+    error: Optional[str]
+
+
+def get_banner() -> str:
+    """Return the CLI banner text."""
+    return """
+    LLM IMPORTER
+    Extract your AI memories
+
+    Import your ChatGPT history into any AI assistant.
+    """
+
+
+def validate_input_file(path: str) -> ValidationResult:
+    """
+    Validate input file exists and get stats.
+
+    Returns ValidationResult with:
+    - valid: True if file exists and is readable
+    - size_bytes: File size (0 if invalid)
+    - error: Error message (None if valid)
+    """
+    if not path:
+        return ValidationResult(valid=False, size_bytes=0, error="No path provided")
+
+    file_path = Path(path)
+
+    if not file_path.exists():
+        return ValidationResult(
+            valid=False,
+            size_bytes=0,
+            error=f"File not found: {path}"
+        )
+
+    if not file_path.is_file():
+        return ValidationResult(
+            valid=False,
+            size_bytes=0,
+            error=f"Path is not a file: {path}"
+        )
+
+    try:
+        size = file_path.stat().st_size
+        return ValidationResult(valid=True, size_bytes=size, error=None)
+    except OSError as e:
+        return ValidationResult(valid=False, size_bytes=0, error=str(e))
+
+
+def format_file_size(size_bytes: int) -> str:
+    """Convert bytes to human-readable string."""
+    if size_bytes < 1024:
+        return f"{size_bytes} bytes"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.2f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+def show_banner(console: Console) -> None:
+    """Display the welcome banner."""
+    console.print(Panel(
+        get_banner().strip(),
+        title="[bold cyan]LLM IMPORTER[/bold cyan]",
+        border_style="cyan"
+    ))
+
+
+def get_input_file(console: Console) -> Optional[str]:
+    """Prompt user for input file path."""
+    console.print()
+    path = Prompt.ask(
+        "[bold]Input file[/bold]",
+        default=DEFAULT_INPUT_PATH
+    )
+
+    result = validate_input_file(path)
+
+    if result.valid:
+        console.print(f"[green]Found:[/green] {path} ({format_file_size(result.size_bytes)})")
+        return path
+    else:
+        console.print(f"[red]Error:[/red] {result.error}")
+        return None
 
 
 def main():
-    """
-    Main entry point.
+    """Main CLI entry point."""
+    console = Console()
 
-    Flow:
-    1. Show welcome banner
-    2. Get input file (default: conversations.json)
-    3. Select extraction depth
-    4. Select LLM provider
-    5. Configure chunk size
-    6. Select output format
-    7. Run pipeline
-    8. Show results
-    """
-    # TODO:
-    # console = Console()
-    # show_banner(console)
-    #
-    # # 1. Input file
-    # input_path = get_input_file(console)
-    #
-    # # 2. Parse
-    # conversations, user_profile = parse_all(input_path)
-    # if user_profile:
-    #     save_user_profile(user_profile)  # Free win!
-    #
-    # # 3. Chunk
-    # chunk_size = get_chunk_size(console)  # Default 65536
-    # chunks = chunk_conversations(conversations, chunk_size)
-    #
-    # # 4. Provider
-    # provider = get_provider(console)
-    #
-    # # 5. Extract
-    # raw_facts = extract_all(chunks, provider)
-    #
-    # # 6. Verify
-    # verified, discarded = verify_all(raw_facts, conversations)
-    # log_stats(verified, discarded)
-    #
-    # # 7. Aggregate
-    # aggregated = aggregate(verified)
-    #
-    # # 8. Deduplicate
-    # unique = deduplicate(aggregated, provider)
-    #
-    # # 9. Distill
-    # md_path, json_path = distill(unique, provider, Path("output"))
-    #
-    # # 10. Done!
-    # show_results(console, md_path, json_path)
-    pass
+    show_banner(console)
 
+    input_file = get_input_file(console)
 
-def show_banner(console):
-    """Show welcome banner."""
-    # TODO: Rich panel with fox logo
-    pass
+    if input_file is None:
+        console.print("\n[yellow]Exiting.[/yellow]")
+        return 1
 
-
-def get_input_file(console) -> Path:
-    """Prompt for input file."""
-    # TODO: Default to conversations.json, show file stats
-    pass
-
-
-def get_extraction_depth(console) -> str:
-    """
-    Select extraction depth.
-
-    - quick: user messages only
-    - medium: user + conversation context
-    - full: complete conversations
-    """
-    # TODO: Rich select menu
-    pass
-
-
-def get_provider(console):
-    """
-    Select LLM provider.
-
-    Local: http://localhost:1234/v1 (sequential)
-    API: base URL + key + optional RPM/TPM (parallel)
-    """
-    # TODO: Rich select, then config prompts
-    pass
-
-
-def get_chunk_size(console) -> int:
-    """Get chunk size (default 65536 = 2^16)."""
-    # TODO: Prompt with default, validate is power of 2 (optional)
-    pass
+    # Stage 1 complete - just exit cleanly
+    console.print("\n[dim]Stage 1 complete. More stages coming soon...[/dim]")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())
