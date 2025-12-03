@@ -12,6 +12,10 @@ Stage 2: Parser
 - Load and parse conversations.json
 - Show stats (conversations, messages, chars)
 - Extract user_editable_context (free wins!)
+
+Stage 3: Chunker
+- Batch conversations into token-limited chunks
+- Show chunk breakdown
 """
 
 from dataclasses import dataclass
@@ -27,7 +31,9 @@ from src.parser import (
     load_conversations,
     get_conversation_stats,
     extract_user_profile,
+    parse_all,
 )
+from src.chunker import chunk_conversations, DEFAULT_CHUNK_SIZE
 
 # Constants
 DEFAULT_INPUT_PATH = "conversations.json"
@@ -164,8 +170,36 @@ def main():
             border_style="green"
         ))
 
-    # Stage 2 complete
-    console.print("\n[dim]Stage 2 complete. More stages coming soon...[/dim]")
+    # Stage 3: Chunk conversations
+    console.print("\n[bold]Chunking conversations...[/bold]")
+    conversations_parsed, _ = parse_all(input_file)
+    chunks = chunk_conversations(conversations_parsed, max_tokens=DEFAULT_CHUNK_SIZE)
+
+    # Show chunk stats
+    chunk_table = Table(title="Chunk Breakdown", show_header=True)
+    chunk_table.add_column("Chunk", style="cyan", justify="right")
+    chunk_table.add_column("Conversations", style="green", justify="right")
+    chunk_table.add_column("Tokens", style="yellow", justify="right")
+
+    for chunk in chunks[:10]:  # Show first 10
+        chunk_table.add_row(
+            str(chunk.id),
+            str(len(chunk.conversations)),
+            f"{chunk.token_count:,}"
+        )
+
+    if len(chunks) > 10:
+        chunk_table.add_row("...", "...", "...")
+        chunk_table.add_row(
+            f"Total: {len(chunks)}",
+            str(sum(len(c.conversations) for c in chunks)),
+            f"{sum(c.token_count for c in chunks):,}"
+        )
+
+    console.print(chunk_table)
+
+    # Stage 3 complete
+    console.print("\n[dim]Stage 3 complete. More stages coming soon...[/dim]")
     return 0
 
 
