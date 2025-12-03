@@ -201,6 +201,27 @@ def get_conversation_stats(conversations: List[Dict[str, Any]]) -> ConversationS
     )
 
 
+def get_stats_from_parsed(conversations: List[Conversation], user_profile: Optional[UserProfile]) -> ConversationStats:
+    """Calculate stats from already-parsed conversations."""
+    total_messages = 0
+    user_messages = 0
+    total_chars = 0
+
+    for convo in conversations:
+        total_messages += len(convo.messages)
+        user_messages += len([m for m in convo.messages if m.role == "user" and not m.is_hidden])
+        for msg in convo.messages:
+            total_chars += len(msg.content)
+
+    return ConversationStats(
+        total_conversations=len(conversations),
+        total_messages=total_messages,
+        user_messages=user_messages,
+        total_chars=total_chars,
+        has_user_profile=user_profile is not None
+    )
+
+
 def parse_all(path: str) -> tuple[List[Conversation], Optional[UserProfile]]:
     """
     Main entry point: parse everything.

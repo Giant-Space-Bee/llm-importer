@@ -68,10 +68,19 @@ conversations.json → Parse → Chunk(65536) → Extract(LLM) → Verify → Ag
 - Every extracted fact includes verbatim quote from original
 - Verify via string match (no LLM needed)
 - No match = hallucinated = discard
+- **Verifier scope:** Search ALL messages in conversation (not just user messages) — quotes might reference assistant context the user was responding to
+- **Unicode normalization:** Normalize curly quotes → straight quotes before matching (LLM may return different apostrophe characters)
 
 **Execution modes:**
 - Local provider (LM Studio) → sequential (one LLM = all resources)
 - API provider → parallel with RPM/TPM rate limiting
+
+**Provider selection & orchestration (Stage 6):**
+- CLI prompts user to choose: local LLM or API
+- If local: `provider.is_local = True` → process chunks sequentially, one at a time
+- If API: `provider.is_local = False` → process chunks in parallel, respecting `rpm`/`tpm` limits
+- Rate limiting: track requests/tokens per minute, sleep when limits approached
+- Checkpointing: save progress after each chunk so crashes don't lose work
 
 **Chunk size:** 65536 (2^16) — fits in 128K context with room for prompt + output
 
@@ -154,6 +163,32 @@ Categories: personal, professional, family, preferences, interests, personality
 
 ## Data Stats
 450 convos, 17M chars (~4.3M tokens), 6,208 user messages, 367 user_editable_context blocks
+
+## Stage 5 Verifier Findings (2025-12-03)
+
+**Implementation:**
+- `normalize_text()`: Handles curly quotes, em/en dashes, ellipsis, whitespace, case
+- `verify_fact()`: Normalized substring match against full conversation
+- `verify_all()`: Batch verification, returns (verified, discarded) lists
+
+**Unicode normalizations:**
+| From | To |
+|------|-----|
+| `'` `'` (U+2018, U+2019) | `'` (straight) |
+| `"` `"` (U+201C, U+201D) | `"` (straight) |
+| `—` (U+2014 em dash) | `-` |
+| `–` (U+2013 en dash) | `-` |
+| `…` (U+2026 ellipsis) | `...` |
+
+**Integration test results:**
+- 3 facts extracted from 4k chunk
+- 3/3 verified (100%)
+- 0 hallucinations
+
+**Key design decisions:**
+1. Verify against ALL messages (`flatten_tree`), not just user messages
+2. Normalize both quote and conversation before matching
+3. Log hallucinations to stderr for debugging
 
 ---
 

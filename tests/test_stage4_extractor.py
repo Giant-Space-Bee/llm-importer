@@ -13,12 +13,10 @@ Run: pytest tests/test_stage4_extractor.py -v
 """
 
 import pytest
-import json
 
 from src.providers import LocalProvider, LLMProvider
 from src.extractor import (
     ExtractedFact,
-    parse_extraction_response,
     build_extraction_prompt,
     CATEGORIES,
 )
@@ -93,113 +91,6 @@ class TestCategories:
         assert "interests" in CATEGORIES
         assert "personality" in CATEGORIES
         assert len(CATEGORIES) == 6
-
-
-class TestParseExtractionResponse:
-    """parse_extraction_response() converts LLM JSON to ExtractedFact objects."""
-
-    def test_parses_valid_json_array(self):
-        """Should parse a valid JSON array of facts."""
-        response = json.dumps([
-            {
-                "fact": "Lives in Victoria, BC",
-                "category": "personal",
-                "source_convo_id": "conv-123",
-                "source_timestamp": 1700000000.0,
-                "source_quote": "I live in Victoria BC"
-            },
-            {
-                "fact": "Works as AI architect",
-                "category": "professional",
-                "source_convo_id": "conv-456",
-                "source_timestamp": 1700000001.0,
-                "source_quote": "I'm an AI architect"
-            }
-        ])
-
-        facts = parse_extraction_response(response)
-
-        assert len(facts) == 2
-        assert facts[0].fact == "Lives in Victoria, BC"
-        assert facts[0].category == "personal"
-        assert facts[1].fact == "Works as AI architect"
-
-    def test_parses_empty_array(self):
-        """Empty array = no facts found (valid response)."""
-        response = "[]"
-        facts = parse_extraction_response(response)
-        assert facts == []
-
-    def test_handles_json_in_markdown_code_block(self):
-        """LLMs often wrap JSON in ```json blocks."""
-        response = """```json
-[
-    {
-        "fact": "Has a dog named Kit",
-        "category": "family",
-        "source_convo_id": "conv-789",
-        "source_timestamp": 1700000002.0,
-        "source_quote": "my dog Kit"
-    }
-]
-```"""
-
-        facts = parse_extraction_response(response)
-        assert len(facts) == 1
-        assert facts[0].fact == "Has a dog named Kit"
-
-    def test_handles_thinking_tags(self):
-        """Hermes 4 may include <think>...</think> before JSON."""
-        response = """<think>
-Let me analyze this conversation for personal facts...
-The user mentions living in Victoria.
-</think>
-
-[
-    {
-        "fact": "Lives in Victoria",
-        "category": "personal",
-        "source_convo_id": "conv-1",
-        "source_timestamp": 1700000000.0,
-        "source_quote": "I live in Victoria"
-    }
-]"""
-
-        facts = parse_extraction_response(response)
-        assert len(facts) == 1
-        assert facts[0].fact == "Lives in Victoria"
-
-    def test_returns_empty_on_invalid_json(self):
-        """Invalid JSON should return empty list, not crash."""
-        response = "This is not valid JSON at all"
-        facts = parse_extraction_response(response)
-        assert facts == []
-
-    def test_returns_empty_on_non_array(self):
-        """Non-array JSON should return empty list."""
-        response = '{"fact": "test"}'  # Object, not array
-        facts = parse_extraction_response(response)
-        assert facts == []
-
-    def test_skips_malformed_facts(self):
-        """Should skip facts missing required fields."""
-        response = json.dumps([
-            {
-                "fact": "Valid fact",
-                "category": "personal",
-                "source_convo_id": "conv-1",
-                "source_timestamp": 1700000000.0,
-                "source_quote": "valid quote"
-            },
-            {
-                "fact": "Missing fields"
-                # Missing category, source_convo_id, etc.
-            }
-        ])
-
-        facts = parse_extraction_response(response)
-        assert len(facts) == 1
-        assert facts[0].fact == "Valid fact"
 
 
 class TestBuildExtractionPrompt:

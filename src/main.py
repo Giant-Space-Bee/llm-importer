@@ -33,10 +33,8 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from src.parser import (
-    load_conversations,
-    get_conversation_stats,
-    extract_user_profile,
     parse_all,
+    get_stats_from_parsed,
 )
 from src.chunker import chunk_conversations, DEFAULT_CHUNK_SIZE
 from src.providers import LocalProvider
@@ -150,10 +148,10 @@ def main():
         console.print("\n[yellow]Exiting.[/yellow]")
         return 1
 
-    # Stage 2: Parse and show stats
-    console.print("\n[bold]Loading conversations...[/bold]")
-    conversations = load_conversations(input_file)
-    stats = get_conversation_stats(conversations)
+    # Stage 2: Parse and show stats (single load)
+    console.print("\n[bold]Loading and parsing conversations...[/bold]")
+    conversations, user_profile = parse_all(input_file)
+    stats = get_stats_from_parsed(conversations, user_profile)
 
     # Show stats table
     table = Table(title="Conversation Stats", show_header=False)
@@ -167,8 +165,7 @@ def main():
 
     console.print(table)
 
-    # Extract user profile (free wins!)
-    user_profile = extract_user_profile(conversations)
+    # Show user profile (free wins!)
     if user_profile:
         console.print("\n[bold green]Found user profile (custom instructions)![/bold green]")
         console.print(Panel(
@@ -179,8 +176,7 @@ def main():
 
     # Stage 3: Chunk conversations
     console.print("\n[bold]Chunking conversations...[/bold]")
-    conversations_parsed, _ = parse_all(input_file)
-    chunks = chunk_conversations(conversations_parsed, max_tokens=DEFAULT_CHUNK_SIZE)
+    chunks = chunk_conversations(conversations, max_tokens=DEFAULT_CHUNK_SIZE)
 
     # Show chunk stats
     chunk_table = Table(title="Chunk Breakdown", show_header=True)

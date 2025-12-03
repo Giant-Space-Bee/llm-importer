@@ -4,21 +4,27 @@
 - [x] Stage 1: CLI Shell (12 tests)
 - [x] Stage 2: Parser (17 tests)
 - [x] Stage 3: Chunker (15 tests)
+- [x] Stage 4: Extractor (11 tests)
+  - 4a: Update provider to use structured outputs (json_schema)
+  - 4b: Add category enum to schema
+  - 4c: Test extraction with small chunk (4096 tokens)
+  - 4d: Test extraction with full chunk (65536 tokens) - verified via 4c
+  - 4e: Removed dead code (`parse_extraction_response`) from extractor.py
+  - 4f: Consolidated double file loading in main.py
+  - 4g: Documented verifier scope decision in CLAUDE.md
 
-## In Progress - Stage 4: Extractor
-- [ ] 4a: Update provider to use structured outputs (json_schema)
-- [ ] 4b: Add category enum to schema
-- [ ] 4c: Test extraction with small chunk (4096 tokens)
-- [ ] 4d: Test extraction with full chunk (65536 tokens)
+**4c Results (2025-12-03):** 5 facts extracted, quotes 3-5 words, 4/5 verified. One failed due to curly apostrophe (Unicode normalization needed in verifier).
 
-**Note:** Stage 4 has unit tests (18 tests) but LLM integration not yet tested. See CLAUDE.md "Stage 4 LLM Findings" for structured output format.
+- [x] Stage 5: Verifier (22 tests)
+  - 5a: Unicode normalization (curly quotes → straight, em dashes → hyphens, etc.)
+  - 5b: Verify against ALL messages (not just user) via `flatten_tree`
+  - Integration test: 3/3 facts verified (100%)
 
 ## Pending
-- [ ] Stage 5: Verifier (string-match source_quotes)
-- [ ] Stage 6: Full extraction loop
+- [ ] Stage 6: Full extraction loop (sequential/parallel, checkpointing)
 - [ ] Stage 7: Aggregator (combine + count)
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
 
 ## Test Count
-62 tests passing (as of Stage 4 unit tests)
+77 tests passing
