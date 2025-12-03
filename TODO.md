@@ -25,10 +25,12 @@
   - [ ] 6a: Research Anthropic API (install package, understand rate limits, pricing)
   - [ ] 6b: Implement APIProvider with rate limiting (rpm/tpm tracking)
   - [ ] 6c: CLI provider selection (local vs API)
-  - [ ] 6d: Sequential processing for local (is_local=True)
-  - [ ] 6e: Parallel processing for API (is_local=False)
-  - [ ] 6f: Checkpointing (save after each chunk, resume on crash)
-  - [ ] 6g: Integration test with full pipeline
+  - [ ] 6d: CLI export type selection (ChatGPT / Claude / auto-detect)
+  - [ ] 6e: Sequential processing for local (is_local=True)
+  - [ ] 6f: Parallel processing for API (is_local=False)
+  - [ ] 6g: Checkpointing (save after each chunk, resume on crash)
+  - [ ] 6h: Integration test with full pipeline
+  - [ ] 6i: "Coming soon" message for other LLM exports (Gemini, etc.)
 - [ ] Stage 7: Aggregator (combine + count)
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
