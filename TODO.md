@@ -20,20 +20,22 @@
   - 5b: Verify against ALL messages (not just user) via `flatten_tree`
   - Integration test: 3/3 facts verified (100%)
 
-## Pending
-- [ ] Stage 6: Full extraction loop
-  - [ ] 6a: Research Anthropic API (install package, understand rate limits, pricing)
-  - [ ] 6b: Implement APIProvider with rate limiting (rpm/tpm tracking)
+## In Progress
+- [ ] Stage 6: Full extraction loop (24 tests)
+  - [x] 6a: Research Anthropic API - Sonnet 4, $3/$15 MTok, structured outputs beta
+  - [x] 6b: APIProvider with rate limiting (24 tests) - RPM/TPM tracking, auto-wait
   - [ ] 6c: CLI provider selection (local vs API)
-  - [ ] 6d: CLI export type selection (ChatGPT / Claude / auto-detect)
-  - [ ] 6e: Sequential processing for local (is_local=True)
+  - [ ] 6d: CLI export type selection (ChatGPT / Claude / auto-detect) - **Claude #2**
+  - [ ] 6e: Sequential processing for local (is_local=True) - **Claude #3**
   - [ ] 6f: Parallel processing for API (is_local=False)
-  - [ ] 6g: Checkpointing (save after each chunk, resume on crash)
+  - [ ] 6g: Checkpointing (save after each chunk, resume on crash) - **Claude #3**
   - [ ] 6h: Integration test with full pipeline
-  - [ ] 6i: "Coming soon" message for other LLM exports (Gemini, etc.)
+  - [ ] 6i: "Coming soon" message for other LLM exports - **Claude #2**
+
+## Pending
 - [ ] Stage 7: Aggregator (combine + count)
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
 
 ## Test Count
-77 tests passing
+101 tests passing

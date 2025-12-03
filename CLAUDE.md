@@ -116,6 +116,31 @@ Categories: personal, professional, family, preferences, interests, personality
 3. Understand before scaling
 4. Small prototype first, then full module
 
+## Stage 6 API Provider Decision
+
+**Model**: Claude Sonnet 4 (`claude-sonnet-4-5-20250929`) - no override
+- Haiku 4.5 lacks structured outputs (as of Dec 2025)
+- Cost: $3/$15 per MTok (input/output)
+- Structured outputs via beta header: `structured-outputs-2025-11-13`
+- Rate limits (Tier 1): ~5 RPM, ~20k TPM
+
+**API Request Format** (Anthropic SDK):
+```python
+from anthropic import Anthropic, transform_schema
+
+client = Anthropic()
+response = client.beta.messages.create(
+    model="claude-sonnet-4-5-20250929",
+    max_tokens=8192,
+    betas=["structured-outputs-2025-11-13"],
+    messages=[{"role": "user", "content": prompt}],
+    output_format={
+        "type": "json_schema",
+        "schema": transform_schema(PydanticModel)
+    }
+)
+```
+
 ## Stage 4 LLM Findings (Hermes 4 70B via LM Studio)
 
 **Tested 2025-12-03:**
