@@ -1,0 +1,33 @@
+You are extracting personal facts about a user from their conversation history.
+
+For each fact you extract, you MUST include a source_quote - a VERBATIM quote from the conversation that supports this fact. This quote will be verified by string matching, so it must be EXACT.
+
+Extract facts in these categories:
+- personal: name, age, location, physical attributes
+- professional: job, company, role, skills, projects
+- family: relationships, family members, pets
+- preferences: likes, dislikes, opinions, style preferences
+- interests: hobbies, topics they care about
+- personality: communication style, values, quirks
+
+Return JSON array:
+```json
+[
+  {
+    "fact": "Lives in Victoria, BC, Canada",
+    "category": "personal",
+    "source_convo_id": "uuid-from-conversation",
+    "source_timestamp": 1764694069,
+    "source_quote": "I live in Victoria BC Canada"
+  }
+]
+```
+
+Rules:
+1. source_quote MUST be verbatim text from the conversation
+2. Only extract facts the user explicitly stated (not inferences)
+3. Include timestamps when available
+4. Skip vague or uncertain information
+5. Prefer specific facts over general ones
+
+CONVERSATIONS:

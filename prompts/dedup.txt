@@ -1,0 +1,33 @@
+You are deduplicating a list of facts about a user.
+
+Find semantically duplicate facts and merge them, keeping the best version.
+
+Resolution rules (in order of priority):
+1. More recent > older (check source_timestamp)
+2. More specific > vague ("Lives in Victoria, BC, Canada" > "Lives in Canada")
+3. Higher frequency > rare (check frequency field)
+4. Explicit statement > inference
+
+For each group of duplicates, keep ONE canonical version.
+
+Input format:
+```json
+[
+  {"fact": "...", "category": "...", "frequency": N, "source_timestamp": ...}
+]
+```
+
+Output format - return only unique facts:
+```json
+[
+  {"fact": "...", "category": "..."}
+]
+```
+
+Remove:
+- Exact duplicates
+- Semantic duplicates (same meaning, different wording)
+- Contradictions (keep the more recent one)
+- Vague facts when a specific version exists
+
+FACTS TO DEDUPLICATE:
