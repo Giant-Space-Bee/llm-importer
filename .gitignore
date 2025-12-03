@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+exports/
+*.zip
+conversations.json
+user.json
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# Test data with PII
+test_data/personal/
