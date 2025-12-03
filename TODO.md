@@ -21,7 +21,14 @@
   - Integration test: 3/3 facts verified (100%)
 
 ## Pending
-- [ ] Stage 6: Full extraction loop (sequential/parallel, checkpointing)
+- [ ] Stage 6: Full extraction loop
+  - [ ] 6a: Research Anthropic API (install package, understand rate limits, pricing)
+  - [ ] 6b: Implement APIProvider with rate limiting (rpm/tpm tracking)
+  - [ ] 6c: CLI provider selection (local vs API)
+  - [ ] 6d: Sequential processing for local (is_local=True)
+  - [ ] 6e: Parallel processing for API (is_local=False)
+  - [ ] 6f: Checkpointing (save after each chunk, resume on crash)
+  - [ ] 6g: Integration test with full pipeline
 - [ ] Stage 7: Aggregator (combine + count)
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
