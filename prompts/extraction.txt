@@ -1,33 +1,74 @@
-You are extracting personal facts about a user from their conversation history.
+You are extracting personal facts about a user from their ChatGPT conversation history. Your goal is to build a profile that could help a new AI assistant understand this person.
 
-For each fact you extract, you MUST include a source_quote - a VERBATIM quote from the conversation that supports this fact. This quote will be verified by string matching, so it must be EXACT.
+## Your Task
 
-Extract facts in these categories:
-- personal: name, age, location, physical attributes
-- professional: job, company, role, skills, projects
-- family: relationships, family members, pets
-- preferences: likes, dislikes, opinions, style preferences
-- interests: hobbies, topics they care about
-- personality: communication style, values, quirks
+Read the conversations below and extract facts about the user. For EACH fact, you MUST provide a `source_quote` - this is a VERBATIM, EXACT quote from the conversation that proves this fact. The quote will be verified by string matching, so it must appear exactly as written in the original text.
 
-Return JSON array:
+## Output Format
+
+Return a JSON array of facts. Each fact must have this exact structure:
+
 ```json
 [
   {
-    "fact": "Lives in Victoria, BC, Canada",
-    "category": "personal",
-    "source_convo_id": "uuid-from-conversation",
-    "source_timestamp": 1764694069,
-    "source_quote": "I live in Victoria BC Canada"
+    "fact": "Clear, concise statement of the fact",
+    "category": "personal|professional|family|preferences|interests|personality",
+    "source_convo_id": "conversation-id-from-header",
+    "source_timestamp": 1700000000.0,
+    "source_quote": "EXACT text from conversation proving this fact"
   }
 ]
 ```
 
-Rules:
-1. source_quote MUST be verbatim text from the conversation
-2. Only extract facts the user explicitly stated (not inferences)
-3. Include timestamps when available
-4. Skip vague or uncertain information
-5. Prefer specific facts over general ones
+## Categories
 
-CONVERSATIONS:
+- **personal**: Name, age, location, physical attributes, health, living situation
+- **professional**: Job, company, role, skills, projects, career history, education
+- **family**: Relationships, family members, pets, significant others
+- **preferences**: Likes, dislikes, opinions, communication style preferences
+- **interests**: Hobbies, topics they care about, things they're learning
+- **personality**: Values, quirks, how they think, emotional patterns
+
+## Rules
+
+1. **source_quote MUST be VERBATIM** - Copy the exact text. Do not paraphrase, summarize, or clean it up. Include typos if present. This is critical for verification.
+
+2. **Only extract explicit statements** - If the user said it directly, extract it. Don't infer facts from context.
+
+3. **Be specific** - "Lives in Victoria, BC, Canada" is better than "Lives in Canada"
+
+4. **Skip uncertain information** - If you're not sure, don't include it.
+
+5. **Get the conversation ID** - Each conversation has an ID in its header. Use that for source_convo_id.
+
+6. **No duplicates** - If the same fact appears multiple times, only extract it once (use the most recent occurrence).
+
+## Examples
+
+Good extraction:
+```json
+{
+  "fact": "Lives in Victoria, BC, Canada",
+  "category": "personal",
+  "source_convo_id": "abc-123-def",
+  "source_timestamp": 1700000000.0,
+  "source_quote": "I live in Victoria BC Canada"
+}
+```
+
+Bad extraction (paraphrased quote - will fail verification):
+```json
+{
+  "fact": "Lives in Victoria, BC, Canada",
+  "source_quote": "The user lives in Victoria"  // WRONG - this is not verbatim
+}
+```
+
+## Edge Cases
+
+- If there are no extractable facts, return an empty array: `[]`
+- If a conversation is just code/technical discussion with no personal info, skip it
+- Focus on the USER's messages, not the assistant's responses
+
+## Conversations to Process
+

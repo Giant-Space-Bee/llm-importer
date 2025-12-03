@@ -16,6 +16,11 @@ Stage 2: Parser
 Stage 3: Chunker
 - Batch conversations into token-limited chunks
 - Show chunk breakdown
+
+Stage 4: Extractor
+- Connect to local LLM
+- Extract facts from first chunk
+- Show extracted facts with source_quote
 """
 
 from dataclasses import dataclass
@@ -34,6 +39,8 @@ from src.parser import (
     parse_all,
 )
 from src.chunker import chunk_conversations, DEFAULT_CHUNK_SIZE
+from src.providers import LocalProvider
+from src.extractor import extract_chunk
 
 # Constants
 DEFAULT_INPUT_PATH = "conversations.json"
@@ -198,8 +205,47 @@ def main():
 
     console.print(chunk_table)
 
-    # Stage 3 complete
-    console.print("\n[dim]Stage 3 complete. More stages coming soon...[/dim]")
+    # Stage 4: Extract from first chunk
+    console.print("\n[bold]Stage 4: Extraction[/bold]")
+    console.print(f"Ready to extract facts from chunk 0 ({chunks[0].token_count:,} tokens)")
+    console.print("[dim]This will call your local LLM at http://127.0.0.1:1234[/dim]")
+
+    proceed = Prompt.ask("\nProceed with extraction?", choices=["y", "n"], default="y")
+    if proceed != "y":
+        console.print("\n[yellow]Skipping extraction.[/yellow]")
+        return 0
+
+    console.print("\n[bold cyan]Calling LLM...[/bold cyan] (this may take a minute)")
+
+    try:
+        provider = LocalProvider()
+        facts = extract_chunk(chunks[0], provider)
+
+        console.print(f"\n[bold green]Extracted {len(facts)} facts![/bold green]")
+
+        # Show the facts
+        if facts:
+            fact_table = Table(title="Extracted Facts (First 10)", show_header=True)
+            fact_table.add_column("Category", style="cyan")
+            fact_table.add_column("Fact", style="green")
+            fact_table.add_column("Source Quote", style="yellow", max_width=40)
+
+            for fact in facts[:10]:
+                quote_preview = fact.source_quote[:37] + "..." if len(fact.source_quote) > 40 else fact.source_quote
+                fact_table.add_row(fact.category, fact.fact, quote_preview)
+
+            if len(facts) > 10:
+                fact_table.add_row("...", f"({len(facts) - 10} more)", "...")
+
+            console.print(fact_table)
+
+    except Exception as e:
+        console.print(f"\n[red]Error during extraction:[/red] {e}")
+        console.print("[dim]Make sure LM Studio is running at http://127.0.0.1:1234[/dim]")
+        return 1
+
+    # Stage 4 complete
+    console.print("\n[dim]Stage 4 complete. More stages coming soon...[/dim]")
     return 0
 
 
