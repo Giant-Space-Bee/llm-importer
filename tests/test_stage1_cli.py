@@ -8,11 +8,17 @@ What Stage 1 does:
 - Shows file stats (size in human-readable format)
 - Exits cleanly
 
+Stage 6 additions:
+- Provider selection (local vs API)
+- get_provider() function
+
 Run: pytest tests/test_stage1_cli.py -v
 """
 
+import os
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 # These imports WILL FAIL until we implement - that's TDD!
 from src.main import (
@@ -21,7 +27,11 @@ from src.main import (
     format_file_size,
     ValidationResult,
     DEFAULT_INPUT_PATH,
+    get_provider,
+    PROVIDER_LOCAL,
+    PROVIDER_API,
 )
+from src.providers import LocalProvider, APIProvider, LLMProvider
 
 
 class TestBanner:
@@ -129,3 +139,53 @@ class TestDefaults:
     def test_default_input_path_is_conversations_json(self):
         """Default should be conversations.json (ChatGPT export filename)."""
         assert DEFAULT_INPUT_PATH == "conversations.json"
+
+
+class TestProviderConstants:
+    """Provider type constants."""
+
+    def test_provider_local_constant(self):
+        """Should have LOCAL provider constant."""
+        assert PROVIDER_LOCAL == "local"
+
+    def test_provider_api_constant(self):
+        """Should have API provider constant."""
+        assert PROVIDER_API == "api"
+
+
+class TestGetProvider:
+    """get_provider() returns correct provider based on choice."""
+
+    def test_local_returns_local_provider(self):
+        """Choosing local should return LocalProvider."""
+        provider = get_provider(PROVIDER_LOCAL)
+        assert isinstance(provider, LocalProvider)
+        assert provider.is_local is True
+
+    def test_api_returns_api_provider(self):
+        """Choosing API should return APIProvider."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = get_provider(PROVIDER_API)
+            assert isinstance(provider, APIProvider)
+            assert provider.is_local is False
+
+    def test_api_requires_api_key(self):
+        """API provider should fail without API key."""
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            with pytest.raises((ValueError, RuntimeError)):
+                get_provider(PROVIDER_API)
+
+    def test_returns_llm_provider(self):
+        """Both provider types should be LLMProvider subclasses."""
+        local = get_provider(PROVIDER_LOCAL)
+        assert isinstance(local, LLMProvider)
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            api = get_provider(PROVIDER_API)
+            assert isinstance(api, LLMProvider)
+
+    def test_invalid_choice_raises(self):
+        """Invalid provider choice should raise error."""
+        with pytest.raises(ValueError):
+            get_provider("invalid")

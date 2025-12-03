@@ -37,11 +37,34 @@ from src.parser import (
     get_stats_from_parsed,
 )
 from src.chunker import chunk_conversations, DEFAULT_CHUNK_SIZE
-from src.providers import LocalProvider
+from src.providers import LocalProvider, APIProvider, LLMProvider
 from src.extractor import extract_chunk
 
 # Constants
 DEFAULT_INPUT_PATH = "conversations.json"
+PROVIDER_LOCAL = "local"
+PROVIDER_API = "api"
+
+
+def get_provider(choice: str) -> LLMProvider:
+    """
+    Create and return the appropriate LLM provider.
+
+    Args:
+        choice: Either PROVIDER_LOCAL or PROVIDER_API
+
+    Returns:
+        LLMProvider instance
+
+    Raises:
+        ValueError: If choice is invalid or API key missing for API provider
+    """
+    if choice == PROVIDER_LOCAL:
+        return LocalProvider()
+    elif choice == PROVIDER_API:
+        return APIProvider()  # Will raise ValueError if no API key
+    else:
+        raise ValueError(f"Invalid provider choice: {choice}. Use '{PROVIDER_LOCAL}' or '{PROVIDER_API}'")
 
 
 @dataclass
