@@ -7,6 +7,11 @@ Stage 1: CLI Shell
 - Validate file exists
 - Show file stats
 - Exit cleanly
+
+Stage 2: Parser
+- Load and parse conversations.json
+- Show stats (conversations, messages, chars)
+- Extract user_editable_context (free wins!)
 """
 
 from dataclasses import dataclass
@@ -16,6 +21,13 @@ from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.table import Table
+
+from src.parser import (
+    load_conversations,
+    get_conversation_stats,
+    extract_user_profile,
+)
 
 # Constants
 DEFAULT_INPUT_PATH = "conversations.json"
@@ -125,8 +137,35 @@ def main():
         console.print("\n[yellow]Exiting.[/yellow]")
         return 1
 
-    # Stage 1 complete - just exit cleanly
-    console.print("\n[dim]Stage 1 complete. More stages coming soon...[/dim]")
+    # Stage 2: Parse and show stats
+    console.print("\n[bold]Loading conversations...[/bold]")
+    conversations = load_conversations(input_file)
+    stats = get_conversation_stats(conversations)
+
+    # Show stats table
+    table = Table(title="Conversation Stats", show_header=False)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Conversations", str(stats.total_conversations))
+    table.add_row("Total Messages", str(stats.total_messages))
+    table.add_row("User Messages", str(stats.user_messages))
+    table.add_row("Total Characters", f"{stats.total_chars:,}")
+
+    console.print(table)
+
+    # Extract user profile (free wins!)
+    user_profile = extract_user_profile(conversations)
+    if user_profile:
+        console.print("\n[bold green]Found user profile (custom instructions)![/bold green]")
+        console.print(Panel(
+            user_profile.user_profile[:500] + ("..." if len(user_profile.user_profile) > 500 else ""),
+            title="User Profile Preview",
+            border_style="green"
+        ))
+
+    # Stage 2 complete
+    console.print("\n[dim]Stage 2 complete. More stages coming soon...[/dim]")
     return 0
 
 
