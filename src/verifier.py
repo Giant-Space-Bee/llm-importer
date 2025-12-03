@@ -6,11 +6,42 @@ Match source_quote back to original conversation.
 No match = hallucinated = discard.
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Union, Any, Dict
 from dataclasses import dataclass
 
-# from .extractor import ExtractedFact
-# from .parser import Conversation
+from src.parser import flatten_tree
+
+
+def get_fact_attr(fact: Any, attr: str, default: Any = "") -> Any:
+    """Get attribute from fact (works with both dict and ExtractedFact dataclass)."""
+    if isinstance(fact, dict):
+        return fact.get(attr, default)
+    else:
+        return getattr(fact, attr, default)
+
+
+def conversation_to_text(conversation: Any) -> str:
+    """
+    Convert a conversation (dict or text) to a searchable text string.
+
+    Handles:
+    - Raw conversation dict with 'mapping' field -> flatten and join message texts
+    - Already-text string -> return as-is
+
+    Returns:
+        Concatenated text of all messages in the conversation
+    """
+    # Already a string
+    if isinstance(conversation, str):
+        return conversation
+
+    # Raw conversation dict - flatten tree and join content
+    if isinstance(conversation, dict) and "mapping" in conversation:
+        messages = flatten_tree(conversation["mapping"])
+        return "\n".join(msg.content for msg in messages if msg.content)
+
+    # Unknown format
+    return ""
 
 
 @dataclass
@@ -32,7 +63,7 @@ def verify_fact(fact: dict, conversation_text: str) -> VerificationResult:
     Returns:
         VerificationResult with verified=True if quote found
     """
-    source_quote = fact.get("source_quote", "")
+    source_quote = get_fact_attr(fact, "source_quote", "")
 
     # Empty quote = automatic fail
     if not source_quote or not source_quote.strip():
@@ -80,8 +111,11 @@ def verify_all(
     discarded = []
 
     for fact in facts:
-        convo_id = fact.get("source_convo_id", "")
-        convo_text = conversations.get(convo_id, "")
+        convo_id = get_fact_attr(fact, "source_convo_id", "")
+        convo_raw = conversations.get(convo_id, "")
+
+        # Convert to text (handles both raw dict and already-text)
+        convo_text = conversation_to_text(convo_raw) if convo_raw else ""
 
         # If conversation not found, fail verification
         if not convo_text:
@@ -152,6 +186,6 @@ def log_hallucination(fact: dict, reason: str = "") -> None:
     """
     # For now, just print to stderr. Later can write to file.
     import sys
-    quote = fact.get("source_quote", "")[:50]
-    fact_text = fact.get("fact", "")[:50]
+    quote = get_fact_attr(fact, "source_quote", "")[:50]
+    fact_text = get_fact_attr(fact, "fact", "")[:50]
     print(f"[HALLUCINATION] {reason}: '{quote}...' -> '{fact_text}...'", file=sys.stderr)

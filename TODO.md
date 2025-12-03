@@ -19,9 +19,7 @@
   - 5a: Unicode normalization (curly quotes → straight, em dashes → hyphens, etc.)
   - 5b: Verify against ALL messages (not just user) via `flatten_tree`
   - Integration test: 3/3 facts verified (100%)
-
-## In Progress
-- [ ] Stage 6: Full extraction loop (65 tests)
+- [x] Stage 6: Full extraction loop (65 tests)
   - [x] 6a: Research Anthropic API - Sonnet 4, $3/$15 MTok, structured outputs beta
   - [x] 6b: APIProvider with rate limiting (24 tests) - RPM/TPM tracking, auto-wait
   - [x] 6c: CLI provider selection (7 tests) - get_provider() with local/API choice
@@ -29,7 +27,7 @@
   - [x] 6e: Sequential processing for local - included in 6f processor
   - [x] 6f: Parallel processing for API (9 tests) - process_all_chunks with semaphore
   - [x] 6g: Checkpointing (14 tests) - save/resume after each chunk
-  - [ ] 6h: Integration test with full pipeline
+  - [x] 6h: Integration test with full pipeline - 14 facts verified from 1 chunk via Claude API
 
 ## Pending
 - [ ] Stage 7: Aggregator (combine + count)
@@ -37,4 +35,4 @@
 - [ ] Stage 9: Distiller (final output)
 
 ## Test Count
-142 tests passing
+134 tests passing

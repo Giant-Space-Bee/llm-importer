@@ -281,11 +281,7 @@ class APIProvider(LLMProvider):
                 messages=[{"role": "user", "content": prompt}],
                 output_format={
                     "type": "json_schema",
-                    "json_schema": {
-                        "name": "extraction",
-                        "strict": True,
-                        "schema": schema
-                    }
+                    "schema": schema
                 }
             )
 

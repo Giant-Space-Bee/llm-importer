@@ -25,6 +25,7 @@ CATEGORIES = [
 ]
 
 # JSON schema for structured output extraction
+# Note: additionalProperties: false required for Anthropic structured outputs
 FACT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -42,11 +43,13 @@ FACT_SCHEMA = {
                     "source_timestamp": {"type": "number"},
                     "source_quote": {"type": "string"}
                 },
-                "required": ["fact", "category", "source_convo_id", "source_timestamp", "source_quote"]
+                "required": ["fact", "category", "source_convo_id", "source_timestamp", "source_quote"],
+                "additionalProperties": False
             }
         }
     },
-    "required": ["facts"]
+    "required": ["facts"],
+    "additionalProperties": False
 }
 
 
