@@ -39,7 +39,7 @@ class LocalProvider(LLMProvider):
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:1234/v1",
-        timeout: float = 300.0  # 5 minutes - extraction can be slow
+        timeout: float = 900.0  # 15 minutes - 70B models are slow on big chunks
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
