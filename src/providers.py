@@ -225,12 +225,12 @@ class APIProvider(LLMProvider):
         # Check RPM
         if self._requests_this_minute >= self.rpm:
             elapsed = time.time() - self._minute_start
-            return max(0, 60 - elapsed + 0.1)  # Wait until next minute + buffer
+            return max(0, SECONDS_PER_MINUTE - elapsed + RATE_LIMIT_BUFFER)  # Wait until next minute + buffer
 
         # Check TPM
         if self._tokens_this_minute + estimated_tokens > self.tpm:
             elapsed = time.time() - self._minute_start
-            return max(0, 60 - elapsed + 0.1)
+            return max(0, SECONDS_PER_MINUTE - elapsed + RATE_LIMIT_BUFFER)
 
         return 0
 
@@ -257,7 +257,7 @@ class APIProvider(LLMProvider):
         try:
             response = self._client.messages.create(
                 model=self.model,
-                max_tokens=8192,
+                max_tokens=DEFAULT_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -282,7 +282,7 @@ class APIProvider(LLMProvider):
         try:
             response = self._client.beta.messages.create(
                 model=self.model,
-                max_tokens=8192,
+                max_tokens=DEFAULT_MAX_TOKENS,
                 betas=[self.STRUCTURED_OUTPUTS_BETA],
                 messages=[{"role": "user", "content": prompt}],
                 output_format={
