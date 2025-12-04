@@ -1,31 +1,23 @@
 """
-main.py - CLI entry point
+main.py - CLI entry point for LLM Importer
 
-Stage 1: CLI Shell
-- Show banner
-- Accept input file (default: conversations.json)
-- Validate file exists
-- Show file stats
-- Exit cleanly
+Full pipeline: Parse → Chunk → Extract → Verify → Aggregate
 
-Stage 2: Parser
-- Load and parse conversations.json
-- Show stats (conversations, messages, chars)
-- Extract user_editable_context (free wins!)
-
-Stage 3: Chunker
-- Batch conversations into token-limited chunks
-- Show chunk breakdown
-
-Stage 4: Extractor
-- Connect to local LLM
-- Extract facts from first chunk
-- Show extracted facts with source_quote
+Usage:
+    python -m src.main                    # Interactive mode
+    python -m src.main conversations.json # Specify input
+    python -m src.main --demo             # Demo: 4k chunks, first chunk only
+    python -m src.main --provider local   # Use local LLM (sequential)
+    python -m src.main --provider api     # Use Anthropic API (parallel)
+    python -m src.main --resume           # Resume from checkpoint
 """
 
-from dataclasses import dataclass
+import argparse
+import hashlib
+import time
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
@@ -39,9 +31,18 @@ from src.parser import (
     load_conversations,
     ExportType,
 )
-from src.chunker import chunk_conversations, DEFAULT_CHUNK_SIZE
+from src.chunker import chunk_conversations, Chunk, DEFAULT_CHUNK_SIZE
 from src.providers import LocalProvider, APIProvider, LLMProvider
-from src.extractor import extract_chunk
+from src.extractor import ExtractedFact
+from src.processor import extract_and_verify_chunk, process_all_chunks
+from src.aggregator import aggregate, group_by_category, AggregatedFact
+from src.checkpoint import (
+    hash_file,
+    save_checkpoint,
+    load_checkpoint,
+    should_resume,
+    get_remaining_chunks,
+)
 
 
 # Supported export types
@@ -74,6 +75,20 @@ def get_coming_soon_message(export_type: ExportType) -> str:
 DEFAULT_INPUT_PATH = "conversations.json"
 PROVIDER_LOCAL = "local"
 PROVIDER_API = "api"
+DEMO_CHUNK_SIZE = 4096  # Smaller chunks for demo mode
+CHECKPOINT_DIR = Path("checkpoints")
+
+
+def get_checkpoint_path(input_file: str) -> Path:
+    """
+    Get checkpoint path for a given input file.
+
+    Uses hash of absolute path to ensure unique checkpoint per input file,
+    avoiding collisions when files have the same name in different directories.
+    """
+    abs_path = Path(input_file).resolve()
+    path_hash = hashlib.sha256(str(abs_path).encode()).hexdigest()[:12]
+    return CHECKPOINT_DIR / f"checkpoint_{path_hash}.json"
 
 
 def get_provider(choice: str) -> LLMProvider:
@@ -95,6 +110,36 @@ def get_provider(choice: str) -> LLMProvider:
         return APIProvider()  # Will raise ValueError if no API key
     else:
         raise ValueError(f"Invalid provider choice: {choice}. Use '{PROVIDER_LOCAL}' or '{PROVIDER_API}'")
+
+
+def select_provider(console: Console, choice: Optional[str] = None) -> LLMProvider:
+    """
+    Select LLM provider interactively or from CLI arg.
+
+    Args:
+        console: Rich console for output
+        choice: Provider choice from CLI, or None to prompt
+
+    Returns:
+        LLMProvider instance
+    """
+    if choice is None:
+        choice = Prompt.ask(
+            "Select provider",
+            choices=[PROVIDER_LOCAL, PROVIDER_API],
+            default=PROVIDER_LOCAL
+        )
+
+    try:
+        provider = get_provider(choice)
+        if provider.is_local:
+            console.print(f"[cyan]Using:[/cyan] Local LLM (sequential processing)")
+        else:
+            console.print(f"[cyan]Using:[/cyan] Anthropic API (parallel processing)")
+        return provider
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1)
 
 
 @dataclass
@@ -162,6 +207,167 @@ def format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
 
 
+def format_elapsed_time(seconds: float) -> str:
+    """Format elapsed seconds as human-readable string."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    elif seconds < 3600:
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{mins}m {secs}s"
+    else:
+        hours = int(seconds // 3600)
+        mins = int((seconds % 3600) // 60)
+        return f"{hours}h {mins}m"
+
+
+def check_existing_checkpoint(
+    console: Console,
+    input_file: str,
+    use_resume: bool
+) -> Tuple[List[int], List[Dict[str, Any]], int]:
+    """
+    Check for existing checkpoint and handle resume logic.
+
+    Args:
+        console: Rich console for output
+        input_file: Path to input file
+        use_resume: Whether --resume flag was passed
+
+    Returns:
+        Tuple of (remaining_chunk_indices, existing_facts, total_chunks)
+        Note: total_chunks is 0 if not resuming (caller needs to compute it)
+    """
+    checkpoint_path = get_checkpoint_path(input_file)
+
+    if should_resume(checkpoint_path, input_file):
+        checkpoint = load_checkpoint(checkpoint_path)
+        if checkpoint:
+            completed = checkpoint.get("completed_chunks", [])
+            existing_facts = checkpoint.get("verified_facts", [])
+
+            if use_resume:
+                console.print(
+                    f"[yellow]Resuming from checkpoint:[/yellow] "
+                    f"{len(completed)} chunks done, {len(existing_facts)} facts"
+                )
+                # Return with -1 for total_chunks to signal "use checkpoint info"
+                return completed, existing_facts, -1
+            else:
+                console.print(
+                    f"[yellow]Note:[/yellow] Valid checkpoint found "
+                    f"({len(completed)} chunks, {len(existing_facts)} facts). "
+                    f"Use --resume to continue, or this will start fresh."
+                )
+
+    return [], [], 0
+
+
+def process_sequential_with_checkpoints(
+    console: Console,
+    chunks: List[Chunk],
+    remaining_indices: List[int],
+    provider: LLMProvider,
+    conversations_by_id: Dict[str, Any],
+    input_file: str,
+    existing_facts: List[Dict[str, Any]]
+) -> List[ExtractedFact]:
+    """
+    Process chunks sequentially with per-chunk checkpointing.
+
+    Used for local LLM where each chunk takes minutes.
+    Saves progress after each chunk so crashes don't lose work.
+
+    Args:
+        console: Rich console for output
+        chunks: All chunks
+        remaining_indices: Which chunk indices still need processing
+        provider: LLM provider
+        conversations_by_id: Raw conversation dicts for verification
+        input_file: Path for checkpoint
+        existing_facts: Previously extracted facts (from checkpoint)
+
+    Returns:
+        All verified facts (existing + new)
+    """
+    checkpoint_path = get_checkpoint_path(input_file)
+    all_facts: List[Any] = list(existing_facts)  # May be dicts or ExtractedFact
+    completed = set(range(len(chunks))) - set(remaining_indices)
+
+    for chunk_idx in remaining_indices:
+        chunk = chunks[chunk_idx]
+        start_time = time.time()
+
+        console.print(
+            f"\n[cyan]Processing chunk {chunk_idx + 1}/{len(chunks)}[/cyan] "
+            f"({chunk.token_count:,} tokens, {len(chunk.conversations)} convos)"
+        )
+
+        # Extract and verify
+        new_facts = extract_and_verify_chunk(chunk, provider, conversations_by_id)
+        all_facts.extend(new_facts)
+
+        elapsed = time.time() - start_time
+        console.print(
+            f"  [green]+{len(new_facts)} verified facts[/green] "
+            f"({len(all_facts)} total) [{format_elapsed_time(elapsed)}]"
+        )
+
+        # Save checkpoint
+        completed.add(chunk_idx)
+        save_checkpoint(checkpoint_path, {
+            "source_file_hash": hash_file(input_file),
+            "completed_chunks": sorted(completed),
+            "verified_facts": [
+                asdict(f) if isinstance(f, ExtractedFact) else f
+                for f in all_facts
+            ]
+        })
+
+    return all_facts  # type: ignore
+
+
+def show_results(console: Console, aggregated: List[AggregatedFact]) -> None:
+    """Display final aggregated results."""
+    by_category = group_by_category(aggregated)
+
+    # Summary table
+    summary = Table(title="Extraction Summary", show_header=True)
+    summary.add_column("Category", style="cyan")
+    summary.add_column("Unique Facts", style="green", justify="right")
+    summary.add_column("Total Mentions", style="yellow", justify="right")
+
+    total_unique = 0
+    total_mentions = 0
+    categories = ["personal", "professional", "family", "preferences", "interests", "personality"]
+
+    for cat in categories:
+        facts = by_category.get(cat, [])
+        unique = len(facts)
+        mentions = sum(f.frequency for f in facts)
+        total_unique += unique
+        total_mentions += mentions
+        if unique > 0:  # Only show categories with facts
+            summary.add_row(cat, str(unique), str(mentions))
+
+    summary.add_row(
+        "[bold]TOTAL[/bold]",
+        f"[bold]{total_unique}[/bold]",
+        f"[bold]{total_mentions}[/bold]"
+    )
+    console.print(summary)
+
+    # Top facts preview
+    if aggregated:
+        console.print("\n[bold]Top Facts (by frequency):[/bold]")
+        sorted_facts = sorted(aggregated, key=lambda f: f.frequency, reverse=True)
+        for f in sorted_facts[:10]:
+            console.print(
+                f"  [{f.fact.category}] {f.fact.fact[:60]}{'...' if len(f.fact.fact) > 60 else ''} "
+                f"(x{f.frequency})"
+            )
+
+
 def show_banner(console: Console) -> None:
     """Display the welcome banner."""
     console.print(Panel(
@@ -191,31 +397,66 @@ def get_input_file(console: Console) -> Optional[str]:
 
 def main():
     """Main CLI entry point."""
-    console = Console()
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+        description="LLM Importer - Extract AI memories from ChatGPT/Claude exports"
+    )
+    parser.add_argument(
+        "input",
+        nargs="?",
+        default=DEFAULT_INPUT_PATH,
+        help=f"Input file (default: {DEFAULT_INPUT_PATH})"
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Demo mode: 4k chunks, first chunk only"
+    )
+    parser.add_argument(
+        "--provider",
+        choices=[PROVIDER_LOCAL, PROVIDER_API],
+        help="LLM provider (default: prompt)"
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from checkpoint"
+    )
+    args = parser.parse_args()
 
+    console = Console()
     show_banner(console)
 
-    input_file = get_input_file(console)
-
-    if input_file is None:
-        console.print("\n[yellow]Exiting.[/yellow]")
+    # Validate input file
+    input_file = args.input
+    result = validate_input_file(input_file)
+    if not result.valid:
+        console.print(f"[red]Error:[/red] {result.error}")
         return 1
+    console.print(f"[green]Found:[/green] {input_file} ({format_file_size(result.size_bytes)})")
 
-    # Stage 2: Parse and show stats (single load)
+    # Check for existing checkpoint
+    completed_chunks, existing_facts, _ = check_existing_checkpoint(
+        console, input_file, args.resume
+    )
+
+    # Parse conversations
     console.print("\n[bold]Loading and parsing conversations...[/bold]")
     conversations, user_profile = parse_all(input_file)
     stats = get_stats_from_parsed(conversations, user_profile)
+
+    # Load raw conversations for verification (need full message tree)
+    raw_convos = load_conversations(input_file)
+    conversations_by_id = {c["id"]: c for c in raw_convos}
 
     # Show stats table
     table = Table(title="Conversation Stats", show_header=False)
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
-
     table.add_row("Conversations", str(stats.total_conversations))
     table.add_row("Total Messages", str(stats.total_messages))
     table.add_row("User Messages", str(stats.user_messages))
     table.add_row("Total Characters", f"{stats.total_chars:,}")
-
     console.print(table)
 
     # Show user profile (free wins!)
@@ -227,9 +468,15 @@ def main():
             border_style="green"
         ))
 
-    # Stage 3: Chunk conversations
-    console.print("\n[bold]Chunking conversations...[/bold]")
-    chunks = chunk_conversations(conversations, max_tokens=DEFAULT_CHUNK_SIZE)
+    # Chunk conversations
+    chunk_size = DEMO_CHUNK_SIZE if args.demo else DEFAULT_CHUNK_SIZE
+    console.print(f"\n[bold]Chunking conversations...[/bold] (max {chunk_size:,} tokens)")
+    chunks = chunk_conversations(conversations, max_tokens=chunk_size)
+
+    # Demo mode: first chunk only
+    if args.demo:
+        chunks = chunks[:1]
+        console.print("[yellow]Demo mode:[/yellow] Processing first chunk only")
 
     # Show chunk stats
     chunk_table = Table(title="Chunk Breakdown", show_header=True)
@@ -237,7 +484,7 @@ def main():
     chunk_table.add_column("Conversations", style="green", justify="right")
     chunk_table.add_column("Tokens", style="yellow", justify="right")
 
-    for chunk in chunks[:10]:  # Show first 10
+    for chunk in chunks[:10]:
         chunk_table.add_row(
             str(chunk.id),
             str(len(chunk.conversations)),
@@ -251,50 +498,80 @@ def main():
             str(sum(len(c.conversations) for c in chunks)),
             f"{sum(c.token_count for c in chunks):,}"
         )
-
     console.print(chunk_table)
 
-    # Stage 4: Extract from first chunk
-    console.print("\n[bold]Stage 4: Extraction[/bold]")
-    console.print(f"Ready to extract facts from chunk 0 ({chunks[0].token_count:,} tokens)")
-    console.print("[dim]This will call your local LLM at http://127.0.0.1:1234[/dim]")
+    # Select provider
+    provider = select_provider(console, args.provider)
 
-    proceed = Prompt.ask("\nProceed with extraction?", choices=["y", "n"], default="y")
-    if proceed != "y":
-        console.print("\n[yellow]Skipping extraction.[/yellow]")
-        return 0
+    # Compute remaining chunks
+    if args.resume and completed_chunks:
+        remaining_indices = get_remaining_chunks(
+            {"completed_chunks": completed_chunks},
+            len(chunks)
+        )
+    else:
+        remaining_indices = list(range(len(chunks)))
+        existing_facts = []
 
-    console.print("\n[bold cyan]Calling LLM...[/bold cyan] (this may take a minute)")
+    if not remaining_indices:
+        console.print("\n[green]All chunks already processed![/green]")
+    else:
+        console.print(f"\n[bold]Processing {len(remaining_indices)} chunks...[/bold]")
 
+    # Process chunks
     try:
-        provider = LocalProvider()
-        facts = extract_chunk(chunks[0], provider)
+        if provider.is_local:
+            # Local LLM: sequential with per-chunk checkpointing
+            verified_facts = process_sequential_with_checkpoints(
+                console,
+                chunks,
+                remaining_indices,
+                provider,
+                conversations_by_id,
+                input_file,
+                existing_facts
+            )
+        else:
+            # API: parallel processing, checkpoint at end
+            start_time = time.time()
+            console.print("[dim]Processing in parallel...[/dim]")
+            new_facts = process_all_chunks(chunks, provider, conversations_by_id)
+            elapsed = time.time() - start_time
+            console.print(
+                f"  [green]Extracted {len(new_facts)} verified facts[/green] "
+                f"[{format_elapsed_time(elapsed)}]"
+            )
+            verified_facts = list(existing_facts) + new_facts
 
-        console.print(f"\n[bold green]Extracted {len(facts)} facts![/bold green]")
+            # Save final checkpoint
+            checkpoint_path = get_checkpoint_path(input_file)
+            save_checkpoint(checkpoint_path, {
+                "source_file_hash": hash_file(input_file),
+                "completed_chunks": list(range(len(chunks))),
+                "verified_facts": [
+                    asdict(f) if isinstance(f, ExtractedFact) else f
+                    for f in verified_facts
+                ]
+            })
 
-        # Show the facts
-        if facts:
-            fact_table = Table(title="Extracted Facts (First 10)", show_header=True)
-            fact_table.add_column("Category", style="cyan")
-            fact_table.add_column("Fact", style="green")
-            fact_table.add_column("Source Quote", style="yellow", max_width=40)
-
-            for fact in facts[:10]:
-                quote_preview = fact.source_quote[:37] + "..." if len(fact.source_quote) > 40 else fact.source_quote
-                fact_table.add_row(fact.category, fact.fact, quote_preview)
-
-            if len(facts) > 10:
-                fact_table.add_row("...", f"({len(facts) - 10} more)", "...")
-
-            console.print(fact_table)
-
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted. Progress saved to checkpoint.[/yellow]")
+        return 1
     except Exception as e:
         console.print(f"\n[red]Error during extraction:[/red] {e}")
-        console.print("[dim]Make sure LM Studio is running at http://127.0.0.1:1234[/dim]")
+        if provider.is_local:
+            console.print("[dim]Make sure LM Studio is running at http://127.0.0.1:1234[/dim]")
         return 1
 
-    # Stage 4 complete
-    console.print("\n[dim]Stage 4 complete. More stages coming soon...[/dim]")
+    # Aggregate
+    if verified_facts:
+        console.print("\n[bold]Aggregating facts...[/bold]")
+        aggregated = aggregate(verified_facts)
+        show_results(console, aggregated)
+    else:
+        console.print("\n[yellow]No facts extracted.[/yellow]")
+
+    console.print("\n[green]Done![/green]")
     return 0
 
 
