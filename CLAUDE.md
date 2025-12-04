@@ -83,11 +83,11 @@ otherwise → unknown
 
 ## Key Patterns
 
-**BatchedLLMTask:**
-- Fits in one call? Do it
-- Too big? Split → process each → merge results
-- Merged results too big? Recurse
-- Like merge-sort for LLM work
+**Chunk-based processing (not BatchedLLMTask):**
+- Chunker splits convos into 65536-token batches upfront
+- Sequential for local (one at a time, one LLM process)
+- Parallel for API (semaphore-based, respects RPM/TPM)
+- Processor handles both modes transparently
 
 **warn_depth (not max_depth):**
 - Warns user at depth 5, 10, 15... (intervals of warn_depth)
@@ -128,16 +128,18 @@ Categories: personal, professional, family, preferences, interests, personality
 - `memory-profile.md` — human readable, categorized
 - `memory-profile.json` — `{ categories: { personal: [...], ... } }` for importing
 
-## Build Order
-1. core.py + providers.py (BatchedLLMTask, token counting, providers)
-2. parser.py (load JSON, extract profile, flatten tree, filter user msgs)
-3. chunker.py (batch to token limit, keep convos intact)
-4. extractor.py (LLM extraction with checkpointing)
-5. verifier.py (string match source_quote)
-6. aggregator.py (concat + frequency count)
-7. deduplicator.py (LLM semantic dedup)
-8. distiller.py (LLM final compression)
-9. main.py (CLI)
+## Build Order (Completed)
+1. ✓ providers.py (LLMProvider abstraction, LocalProvider, APIProvider with rate limiting)
+2. ✓ parser.py (load JSON, detect export type, flatten tree, filter user msgs)
+3. ✓ chunker.py (batch to token limit, keep convos intact)
+4. ✓ extractor.py (LLM extraction with structured outputs)
+5. ✓ verifier.py (Unicode-normalized string match on source_quote)
+6. ✓ aggregator.py (concat, dedup by normalized text, count frequency)
+7. ✓ checkpoint.py (save/resume after each chunk)
+8. ✓ processor.py (sequential for local LLM, parallel for API with semaphore)
+9. ✓ main.py (CLI with provider selection, export type detection)
+10. ○ deduplicator.py (LLM semantic dedup) — stub, pending Stage 8
+11. ○ distiller.py (LLM final compression) — stub, pending Stage 9
 
 ## Before Building Each LLM Step
 
@@ -216,8 +218,10 @@ response = client.beta.messages.create(
 3. Enforce our category enum in the schema
 4. Chunk sizes show as ~61k because convos don't pack perfectly to exactly 65536
 
-## Data Stats
-450 convos, 17M chars (~4.3M tokens), 6,208 user messages, 367 user_editable_context blocks
+## Project Stats
+- **Source data:** 450 convos, 17M chars (~4.3M tokens), 6,208 user messages, 367 user_editable_context blocks
+- **Test coverage:** 173 tests (Stage 1-7 complete; Stage 8-9 stubs)
+- **Modules:** 11 src files (providers, parser, chunker, extractor, verifier, aggregator, checkpoint, processor, deduplicator, distiller, main)
 
 ## Stage 5 Verifier Findings (2025-12-03)
 
