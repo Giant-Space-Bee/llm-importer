@@ -6,13 +6,19 @@ Match source_quote back to original conversation.
 No match = hallucinated = discard.
 """
 
-from typing import List, Tuple, Union, Any, Dict
+from typing import List, Tuple, Union, Any, Dict, TYPE_CHECKING
 from dataclasses import dataclass
 
 from src.parser import flatten_tree
 
+if TYPE_CHECKING:
+    from src.extractor import ExtractedFact
 
-def get_fact_attr(fact: Any, attr: str, default: Any = "") -> Any:
+# Type alias for facts - can be dict or ExtractedFact dataclass
+Fact = Union[Dict[str, Any], "ExtractedFact"]
+
+
+def get_fact_attr(fact: Fact, attr: str, default: Any = "") -> Any:
     """Get attribute from fact (works with both dict and ExtractedFact dataclass)."""
     if isinstance(fact, dict):
         return fact.get(attr, default)
@@ -59,17 +65,17 @@ def conversation_to_text(conversation: Any) -> str:
 @dataclass
 class VerificationResult:
     """Result of verifying a fact."""
-    fact: object  # ExtractedFact
+    fact: Fact  # ExtractedFact or dict
     verified: bool
     match_location: str  # Where the quote was found (or "NOT FOUND")
 
 
-def verify_fact(fact: dict, conversation_text: str) -> VerificationResult:
+def verify_fact(fact: Fact, conversation_text: str) -> VerificationResult:
     """
     Verify a single fact by finding its source_quote in conversation text.
 
     Args:
-        fact: Dict with source_quote field
+        fact: Dict or ExtractedFact with source_quote field
         conversation_text: Full conversation text (ALL messages, not just user)
 
     Returns:
@@ -105,15 +111,15 @@ def verify_fact(fact: dict, conversation_text: str) -> VerificationResult:
 
 
 def verify_all(
-    facts: List[dict],
-    conversations: dict
-) -> Tuple[List[dict], List[dict]]:
+    facts: List[Fact],
+    conversations: Dict[str, Any]
+) -> Tuple[List[Fact], List[Fact]]:
     """
     Verify all facts, separate into verified and discarded.
 
     Args:
-        facts: List of fact dicts with source_quote and source_convo_id
-        conversations: Dict mapping convo_id -> full conversation text
+        facts: List of fact dicts or ExtractedFact objects with source_quote and source_convo_id
+        conversations: Dict mapping convo_id -> raw conversation dict (ChatGPT or Claude format)
 
     Returns:
         - verified: facts where source_quote was found
@@ -188,12 +194,12 @@ def normalize_text(text: str) -> str:
     return text
 
 
-def log_hallucination(fact: dict, reason: str = "") -> None:
+def log_hallucination(fact: Fact, reason: str = "") -> None:
     """
     Log a discarded hallucination for debugging.
 
     Args:
-        fact: The fact that failed verification
+        fact: The fact (dict or ExtractedFact) that failed verification
         reason: Why it failed (e.g., "NOT FOUND", "conversation not found")
     """
     # For now, just print to stderr. Later can write to file.

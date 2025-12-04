@@ -21,9 +21,12 @@ Thumbs.db
 
 # Project specific
 exports/
+export_data/
 *.zip
 conversations.json
 user.json
+test_*.json
+checkpoints/
 
 # Environment
 .env
