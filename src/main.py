@@ -31,6 +31,7 @@ from src.parser import (
     load_conversations,
     load_claude_memories,
     format_memories_for_distiller,
+    format_user_profile_for_distiller,
     ExportType,
     ClaudeMemories,
 )
@@ -522,6 +523,12 @@ def main():
                     title=f"Claude Memories ({len(claude_memories.project_memories)} projects)",
                     border_style="green"
                 ))
+
+    # Use ChatGPT user profile as trusted baseline if no Claude memories
+    # Priority: Claude memories > ChatGPT user profile (Claude is richer)
+    if trusted_context is None and user_profile:
+        trusted_context = format_user_profile_for_distiller(user_profile)
+        console.print("\n[bold green]Using custom instructions as trusted baseline[/bold green]")
 
     # Chunk conversations
     chunk_size = DEMO_CHUNK_SIZE if args.demo else DEFAULT_CHUNK_SIZE
