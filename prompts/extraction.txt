@@ -25,7 +25,7 @@ Return facts as JSON. Every fact MUST have all 5 fields - facts without source_q
 
 ## Critical Rules
 
-1. **source_quote is MANDATORY** - Every fact needs a short (5-15 word) verbatim quote. This quote must appear EXACTLY in the original text - it will be verified by string matching. No quote = fact is discarded.
+1. **source_quote is COPY-PASTE ONLY** - Every fact needs a short (5-15 word) quote COPIED DIRECTLY from the text. DO NOT paraphrase or reword. The quote must pass a substring match against the original - even small rewordings will FAIL verification and the fact will be DISCARDED.
 
 2. **Keep quotes SHORT** - Just enough words to verify. "I'm the head of AI" not the entire paragraph.
 
@@ -80,6 +80,24 @@ BAD - vague fact:
   "fact": "Makes music"
 }
 ```
+
+BAD - paraphrased quote (WILL FAIL verification):
+```json
+{
+  "fact": "Has two dogs named Kit and Jupiter",
+  "source_quote": "two dogs, Kit and Jupiter"
+}
+```
+Why it fails: Original text said "two dogs, one who is 14 (named Kit) and one we just got named Jupiter" - the quote was reworded. Copy the EXACT substring instead: "two dogs, one who is 14 (named Kit)"
+
+BAD - reordered quote (WILL FAIL verification):
+```json
+{
+  "fact": "Works as Head of AI at EvolveWell",
+  "source_quote": "Head of AI at EvolveWell"
+}
+```
+Why it fails: Original text said "I'm the head of AI" and "at EvolveWell" separately. Don't combine/reorder - copy ONE exact substring: "I'm the head of AI"
 
 ## Edge Cases
 

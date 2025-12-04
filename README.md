@@ -10,29 +10,58 @@ You've spent months/years building a relationship with your AI. It knows your pr
 
 ## How It Works
 
-1. **Export** your data from ChatGPT (Settings → Data Controls → Export)
-2. **Parse** conversations and extract meaningful context
-3. **Generate** a "memory profile" with your preferences, facts, and personality
-4. **Import** into Claude, Gemini, or any LLM that accepts context
+1. **Export** your data from ChatGPT or Claude
+2. **Parse** conversations and extract meaningful facts with LLM
+3. **Verify** extracted facts against source (catches hallucinations)
+4. **Generate** a categorized memory profile
 
-## Features (Planned)
+## Features
 
-- [ ] Parse ChatGPT `conversations.json` export
-- [ ] LLM-powered fact/preference extraction
-- [ ] Personality analysis (Big Five traits)
-- [ ] Generate Claude-compatible memory format
-- [ ] Generate system prompts for any LLM
-- [ ] Privacy-first: all processing local
+- [x] Parse ChatGPT `conversations.json` export (tree structure)
+- [x] Parse Claude export (flat message arrays)
+- [x] Auto-detect export type
+- [x] LLM-powered fact extraction with structured outputs
+- [x] Hallucination detection via source quote verification
+- [x] Unicode normalization for quote matching
+- [x] Checkpointing (resume interrupted runs)
+- [x] Local LLM support (LM Studio) - sequential processing
+- [x] API support (Claude Sonnet) - parallel with rate limiting
+- [ ] Semantic deduplication (Stage 8)
+- [ ] Final profile distillation (Stage 9)
+
+## Pipeline
+
+```
+conversations.json → Parse → Chunk → Extract(LLM) → Verify → Aggregate → Dedup(LLM) → Distill(LLM) → Output
+```
 
 ## Tech Stack
 
-- Python 3.11+
-- Mem0 for memory extraction
-- LLM APIs (Claude/GPT-4) for intelligent parsing
+- Python 3.12+
+- Local LLM via LM Studio (Hermes 4 70B tested)
+- Claude API with structured outputs
+- No vector DBs, no Mem0 - just LLMs + string matching
+
+## Quick Start
+
+```bash
+# Install
+pip install -r requirements.txt
+
+# Run with local LLM (LM Studio must be running)
+python -m src.main export_data/your-export/conversations.json
+
+# Run tests
+pytest tests/ -v
+```
 
 ## Status
 
-🚧 **Early Development** - Research phase complete, building MVP
+**Active Development** - Core pipeline complete (Stages 1-7), semantic deduplication in progress.
+
+- 186 tests passing
+- 11 source modules
+- Supports both ChatGPT and Claude exports
 
 ## License
 
