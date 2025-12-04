@@ -20,6 +20,8 @@ You've spent months/years building a relationship with your AI. It knows your pr
 - [x] Parse ChatGPT `conversations.json` export (tree structure)
 - [x] Parse Claude export (flat message arrays)
 - [x] Auto-detect export type
+- [x] Modular parser architecture (`src/parsers/` package)
+- [x] Trusted baseline from custom instructions (ChatGPT) and memories (Claude)
 - [x] LLM-powered fact extraction with structured outputs
 - [x] Hallucination detection via source quote verification
 - [x] Unicode normalization for quote matching
@@ -59,8 +61,8 @@ pytest tests/ -v
 
 **Active Development** - Core pipeline complete (Stages 1-7), semantic deduplication in progress.
 
-- 186 tests passing
-- 11 source modules
+- 190 tests passing
+- 16 source modules (modular `parsers/` package)
 - Supports both ChatGPT and Claude exports
 
 ## License

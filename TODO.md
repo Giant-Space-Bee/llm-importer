@@ -41,6 +41,17 @@
   - 7b: `group_by_category()` - organize for deduplication
   - Reuses `normalize_text()` from verifier for case/unicode normalization
 
+- [x] Parser Refactor (Dec 2025)
+  - Split `parser.py` (485 lines) into `src/parsers/` package
+  - `types.py`, `chatgpt.py`, `claude.py`, `memories.py`
+  - `parser.py` now a ~95-line facade with re-exports
+  - All 186 existing tests pass unchanged
+
+- [x] ChatGPT Trusted Baseline (Dec 2025, 4 new tests)
+  - `format_user_profile_for_distiller()` formats custom instructions
+  - `main.py` uses ChatGPT profile when Claude memories unavailable
+  - Priority: Claude memories > ChatGPT profile
+
 ## Pending
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
@@ -76,4 +87,4 @@ pre-commit run --all-files
 ```
 
 ## Test Count
-186 tests passing
+190 tests passing
