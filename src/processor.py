@@ -29,8 +29,12 @@ def extract_and_verify_chunk(
     Args:
         chunk: The chunk to process
         provider: LLM provider for extraction
-        conversations_by_id: Optional dict mapping convo_id -> raw conversation
-                            for verification. If None, skips verification.
+        conversations_by_id: Dict mapping convo_id -> raw conversation dict.
+                            MUST be raw dicts from load_conversations(), NOT
+                            parsed Conversation objects. The verifier needs
+                            raw format to extract text via conversation_to_text().
+                            Supports both ChatGPT (mapping) and Claude (chat_messages).
+                            If None, skips verification.
 
     Returns:
         List of verified ExtractedFact objects
@@ -84,7 +88,8 @@ def process_chunks_sequential(
     Args:
         chunks: List of chunks to process
         provider: LLM provider (should have is_local=True)
-        conversations_by_id: Optional dict for verification
+        conversations_by_id: Raw conversation dicts from load_conversations()
+                            keyed by conversation ID. Required for verification.
 
     Returns:
         Combined list of verified facts from all chunks
@@ -112,7 +117,8 @@ async def process_chunks_parallel(
     Args:
         chunks: List of chunks to process
         provider: LLM provider (should have is_local=False)
-        conversations_by_id: Optional dict for verification
+        conversations_by_id: Raw conversation dicts from load_conversations()
+                            keyed by conversation ID. Required for verification.
         max_concurrent: Maximum concurrent requests (default 5 for Tier 1)
 
     Returns:
@@ -161,7 +167,9 @@ def process_all_chunks(
     Args:
         chunks: List of chunks to process
         provider: LLM provider
-        conversations_by_id: Optional dict for verification
+        conversations_by_id: Raw conversation dicts from load_conversations()
+                            keyed by conversation ID. Required for verification.
+                            Example: {c['id']: c for c in load_conversations(path)}
         max_concurrent: Max concurrent requests for parallel mode
 
     Returns:
