@@ -29,17 +29,19 @@ Return facts as JSON. Every fact MUST have all 5 fields - facts without source_q
 
 2. **Keep quotes SHORT** - Just enough words to verify. "I'm the head of AI" not the entire paragraph.
 
-3. **Be SPECIFIC in facts** - Include names, places, details.
+3. **Use straight ASCII quotes** - In source_quote, always use straight quotes (') and (") not curly quotes (' ' " "). The verification is case-insensitive but quote style matters.
+
+4. **Be SPECIFIC in facts** - Include names, places, details.
    - BAD: "Has a daughter"
    - GOOD: "Has a daughter named Lily"
    - BAD: "Works in tech"
    - GOOD: "Works as Head of AI at Evolve"
 
-4. **Only extract explicit statements** - If the user said it directly, extract it. Don't infer.
+5. **Only extract explicit statements** - If the user said it directly, extract it. Don't infer.
 
-5. **Get the conversation ID** - Each conversation header has an ID. Use it for source_convo_id.
+6. **Get the conversation ID** - Each conversation header has an ID. Use it for source_convo_id.
 
-6. **No duplicates** - Same fact appears twice? Extract only the most recent one.
+7. **No duplicates** - Same fact appears twice? Extract only the most recent one.
 
 ## Examples
 
@@ -86,4 +88,3 @@ BAD - vague fact:
 - Focus on USER messages, not assistant responses
 
 ## Conversations to Process
-

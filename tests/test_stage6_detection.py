@@ -147,10 +147,10 @@ class TestComingSoonMessage:
         assert is_supported_export("chatgpt") is True
 
     def test_is_supported_export_claude(self):
-        """Claude should NOT be supported yet."""
+        """Claude should be supported."""
         from src.main import is_supported_export
 
-        assert is_supported_export("claude") is False
+        assert is_supported_export("claude") is True
 
     def test_is_supported_export_unknown(self):
         """Unknown should NOT be supported."""
