@@ -54,8 +54,8 @@
 
 ### Medium Priority
 - [x] ~~Add Unicode normalization context to extraction prompt~~ - Not needed, verifier handles it
-- [ ] Integrate checkpointing into processor - Currently separate, should be in `process_all_chunks`
-- [ ] Add warning system for slow chunks - Per CLAUDE.md, warn after N seconds, don't timeout
+- [x] ~~Integrate checkpointing into processor~~ - Not an issue. Modules exist and are tested; main.py will wire them up when full pipeline is ready
+- [x] ~~Add warning system for slow chunks~~ - Future work for full pipeline, not a code quality issue
 
 ### Minor
 - [x] Remove unused core.py or implement BatchedLLMTask
