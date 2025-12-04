@@ -10,11 +10,21 @@ This is the public API facade. Implementation details are in src/parsers/:
 Usage:
     from src.parser import parse_all, load_conversations, detect_export_type
     conversations, user_profile = parse_all("conversations.json")
+
+Adding a new export format:
+    1. Create parsers/newformat.py with parse_newformat_conversations()
+    2. Add detection logic to detect_export_type()
+    3. Register in _PARSERS dict: _PARSERS["newformat"] = (parser_func, profile_extractor)
+    4. Update ExportType in parsers/types.py
+
+Backward compatibility:
+    _parse_claude_message and _parse_iso_timestamp are aliased for verifier.py
+    and tests. Do not remove without updating those consumers.
 """
 
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Callable
 
 # Re-export types from parsers package
 from src.parsers.types import (
@@ -50,9 +60,21 @@ from src.parsers.memories import (
     format_user_profile_for_distiller,
 )
 
-# Backward compatibility aliases for internal functions
-# Tests import these with underscore prefix
-_parse_message = parse_message
+# Type alias for parser registry entries
+# Each entry is (parser_func, profile_extractor_or_None)
+ParserEntry = Tuple[
+    Callable[[List[Dict[str, Any]]], List[Conversation]],
+    Optional[Callable[[List[Dict[str, Any]]], Optional[UserProfile]]]
+]
+
+# Parser registry: maps export_type -> (parser_func, profile_extractor)
+# To add a new format: add entry here after implementing parser module
+_PARSERS: Dict[str, ParserEntry] = {
+    "chatgpt": (parse_chatgpt_conversations, extract_user_profile),
+    "claude": (parse_claude_conversations, None),
+}
+
+# Backward compatibility aliases (used by verifier.py and tests)
 _parse_iso_timestamp = parse_iso_timestamp
 _parse_claude_message = parse_claude_message
 
@@ -132,23 +154,26 @@ def parse_all(path: str) -> Tuple[List[Conversation], Optional[UserProfile]]:
     """
     Main entry point: parse everything.
 
-    Auto-detects export type (ChatGPT vs Claude) and uses the appropriate parser.
+    Auto-detects export type (ChatGPT vs Claude) and uses the appropriate
+    parser from the registry.
 
     Returns:
         - List of linearized Conversations
         - UserProfile if found (ChatGPT custom instructions only)
+
+    Raises:
+        ValueError: If export type is unknown/unsupported
     """
     raw = load_conversations(path)
     export_type = detect_export_type(raw)
 
-    if export_type == "chatgpt":
-        conversations = parse_chatgpt_conversations(raw)
-        user_profile = extract_user_profile(raw)
-    elif export_type == "claude":
-        conversations = parse_claude_conversations(raw)
-        user_profile = None  # Claude doesn't have user_editable_context
-    else:
-        raise ValueError("Unknown export type. Expected ChatGPT or Claude format.")
+    if export_type not in _PARSERS:
+        supported = ", ".join(_PARSERS.keys())
+        raise ValueError(f"Unknown export type. Expected one of: {supported}")
+
+    parser, profile_extractor = _PARSERS[export_type]
+    conversations = parser(raw)
+    user_profile = profile_extractor(raw) if profile_extractor else None
 
     return conversations, user_profile
 
@@ -183,8 +208,7 @@ __all__ = [
     "load_claude_memories",
     "format_memories_for_distiller",
     "format_user_profile_for_distiller",
-    # Backward compat aliases
-    "_parse_message",
+    # Backward compat aliases (verifier.py, tests)
     "_parse_iso_timestamp",
     "_parse_claude_message",
 ]
