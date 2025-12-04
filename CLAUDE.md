@@ -259,8 +259,8 @@ response = client.beta.messages.create(
 
 ## Project Stats
 - **Source data:** 450 convos, 17M chars (~4.3M tokens), 6,208 user messages, 367 user_editable_context blocks
-- **Test coverage:** 186 tests, 0 skipped (Stage 1-7 complete; Stage 8-9 stubs)
-- **Modules:** 11 src files (providers, parser, chunker, extractor, verifier, aggregator, checkpoint, processor, deduplicator, distiller, main)
+- **Test coverage:** 190 tests, 0 skipped (Stage 1-7 complete; Stage 8-9 stubs)
+- **Modules:** 16 src files (parser facade + parsers/{types,chatgpt,claude,memories} + providers, chunker, extractor, verifier, aggregator, checkpoint, processor, deduplicator, distiller, main)
 
 ## Stage 5 Verifier Findings (2025-12-03)
 
@@ -290,15 +290,25 @@ response = client.beta.messages.create(
 
 ---
 
+## Completed Refactors
+
+**Parser modularization (Dec 2025):**
+- Split `parser.py` (485 lines) into `src/parsers/` package:
+  - `types.py`: Shared dataclasses (Message, Conversation, etc.)
+  - `chatgpt.py`: ChatGPT tree parsing, user_editable_context
+  - `claude.py`: Claude flat array parsing, ISO timestamps
+  - `memories.py`: Trusted baseline handling (Claude memories, ChatGPT profile)
+- `parser.py` is now a ~95-line facade with re-exports
+- All imports remain backward compatible
+
+**ChatGPT user_editable_context as trusted baseline (Dec 2025):**
+- `format_user_profile_for_distiller()` formats custom instructions for distiller
+- `main.py` uses ChatGPT profile when Claude memories unavailable
+- Priority: Claude memories > ChatGPT profile (Claude is richer)
+
 ## Future Work
 
-**ChatGPT user_editable_context as trusted baseline:**
-- Currently parsed as `UserProfile` but not passed to distiller
-- Same pattern as Claude memories: pass to distiller as `trusted_context`
-- Lower priority than Claude memories (less rich — just custom instructions, not synthesized profile)
-
-**Refactor parser.py (484 lines):**
-- Split into modules: `parsers/chatgpt.py`, `parsers/claude.py`, `parsers/memories.py`
-- Keep `parser.py` as facade with `parse_all()`, `detect_export_type()`
-- Makes adding Gemini/other formats cleaner
+**Add Gemini export support:**
+- Add `parsers/gemini.py` following the same pattern
+- Update `detect_export_type()` for Gemini format
 - Consider abstract base or protocol for format parsers

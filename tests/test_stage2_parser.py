@@ -625,3 +625,64 @@ class TestFormatMemoriesForDistiller:
         assert "Main memory" in formatted
         assert "Project 1 content" in formatted
         assert "Project 2 content" in formatted
+
+
+# --- ChatGPT user profile as trusted baseline tests ---
+
+from src.parser import format_user_profile_for_distiller
+
+
+class TestFormatUserProfileForDistiller:
+    """Tests for format_user_profile_for_distiller() function."""
+
+    def test_formats_full_profile(self):
+        """Should format both user_profile and user_instructions."""
+        profile = UserProfile(
+            user_profile="I am a software developer specializing in Python.",
+            user_instructions="Be concise and use code examples."
+        )
+
+        formatted = format_user_profile_for_distiller(profile)
+
+        assert "About the User" in formatted
+        assert "software developer" in formatted
+        assert "User Preferences" in formatted
+        assert "Be concise" in formatted
+
+    def test_formats_profile_only(self):
+        """Should work with only user_profile (no instructions)."""
+        profile = UserProfile(
+            user_profile="I am a teacher.",
+            user_instructions=""
+        )
+
+        formatted = format_user_profile_for_distiller(profile)
+
+        assert "About the User" in formatted
+        assert "teacher" in formatted
+        assert "User Preferences" not in formatted  # No instructions section
+
+    def test_formats_instructions_only(self):
+        """Should work with only user_instructions (no profile)."""
+        profile = UserProfile(
+            user_profile="",
+            user_instructions="Always explain step by step."
+        )
+
+        formatted = format_user_profile_for_distiller(profile)
+
+        assert "About the User" not in formatted  # No profile section
+        assert "User Preferences" in formatted
+        assert "step by step" in formatted
+
+    def test_empty_profile(self):
+        """Should handle empty profile gracefully."""
+        profile = UserProfile(
+            user_profile="",
+            user_instructions=""
+        )
+
+        formatted = format_user_profile_for_distiller(profile)
+
+        # Should be empty or minimal
+        assert formatted == ""
