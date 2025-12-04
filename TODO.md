@@ -45,16 +45,29 @@
   - Split `parser.py` (485 lines) into `src/parsers/` package
   - `types.py`, `chatgpt.py`, `claude.py`, `memories.py`
   - `parser.py` now a ~95-line facade with re-exports
-  - All 186 existing tests pass unchanged
+  - All existing tests pass unchanged
 
 - [x] ChatGPT Trusted Baseline (Dec 2025, 4 new tests)
   - `format_user_profile_for_distiller()` formats custom instructions
   - `main.py` uses ChatGPT profile when Claude memories unavailable
   - Priority: Claude memories > ChatGPT profile
 
+- [x] Stage 8: Deduplicator (29 tests)
+  - Two-phase hybrid approach for semantic deduplication
+  - Phase 1: Within-category dedup (timestamp-batched, merge-sort)
+  - Phase 2: Cross-category merge-sort (catches miscategorized duplicates)
+  - `DeduplicatedFact` dataclass with `DEDUP_SCHEMA` for structured outputs
+  - Dedup rules: newer > older, specific > vague, frequent > rare
+  - Safety: handles pathological cases where LLM doesn't reduce count
+
 ## Pending
-- [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
+
+## Future Work
+- [ ] Add Gemini export support
+  - Add `parsers/gemini.py` following the same pattern
+  - Update `detect_export_type()` for Gemini format
+  - Consider abstract base or protocol for format parsers
 
 ## Code Quality Issues (from review 2025-12-03)
 
@@ -87,4 +100,4 @@ pre-commit run --all-files
 ```
 
 ## Test Count
-190 tests passing
+Run `pytest tests/ -v` to verify current count.
