@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import tiktoken
 
-from src.parser import Conversation, Message
+from src.parser import Conversation
 
 # Default chunk size: 2^16 = 65536 (Landon likes powers of 2)
 DEFAULT_CHUNK_SIZE = 65536
