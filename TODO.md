@@ -36,8 +36,12 @@
   - [x] Tests for both export types (13 tests added)
   - [x] Verifier handles both raw conversation formats
 
+- [x] Stage 7: Aggregator (17 tests)
+  - 7a: `aggregate()` - group facts by normalized text, count frequency, keep newest
+  - 7b: `group_by_category()` - organize for deduplication
+  - Reuses `normalize_text()` from verifier for case/unicode normalization
+
 ## Pending
-- [ ] Stage 7: Aggregator (combine + count)
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
 
@@ -45,19 +49,19 @@
 
 ### Critical
 - [x] Fix verifier type hints - Use `Fact = Union[dict, ExtractedFact]` type alias
-- [ ] Document `conversations_by_id` format - Must be raw dicts for `conversation_to_text()`
-- [ ] Enable Claude export support in main.py - Remove hardcoded "chatgpt" restriction
+- [x] Document `conversations_by_id` format - Must be raw dicts for `conversation_to_text()`
+- [x] Enable Claude export support in main.py - Remove hardcoded "chatgpt" restriction
 
 ### Medium Priority
-- [ ] Add Unicode normalization context to extraction prompt - Tell LLM to use straight quotes
+- [x] ~~Add Unicode normalization context to extraction prompt~~ - Not needed, verifier handles it
 - [ ] Integrate checkpointing into processor - Currently separate, should be in `process_all_chunks`
 - [ ] Add warning system for slow chunks - Per CLAUDE.md, warn after N seconds, don't timeout
 
 ### Minor
-- [ ] Remove unused core.py or implement BatchedLLMTask
-- [ ] Remove unused Message import from chunker.py
-- [ ] Extract magic numbers to constants in providers.py (60 seconds, 5 retries, etc.)
-- [ ] Fix ThreadPoolExecutor cleanup in processor.py - Use context manager
+- [x] Remove unused core.py or implement BatchedLLMTask
+- [x] Remove unused Message import from chunker.py
+- [x] Extract magic numbers to constants in providers.py (60 seconds, 5 retries, etc.)
+- [x] Fix ThreadPoolExecutor cleanup in processor.py - Use context manager
 
 ## Dev Commands
 ```bash
@@ -72,4 +76,4 @@ pre-commit run --all-files
 ```
 
 ## Test Count
-147 tests passing
+164 tests passing

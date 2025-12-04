@@ -1,5 +1,7 @@
 # LLM Importer
 
+> **Dec 2025** — Use modern Python 3.12+ patterns. No deprecated APIs. When unsure, look it up.
+
 Extract memories from ChatGPT export → `memory-profile.md` + `.json` for new AI.
 No vector DBs, no Mem0, no KV stores. Just LLMs + string matching.
 
