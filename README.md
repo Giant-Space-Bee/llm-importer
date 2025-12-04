@@ -44,14 +44,52 @@ conversations.json → Parse → Chunk → Extract(LLM) → Verify → Aggregate
 
 ## Quick Start
 
+### Prerequisites
+
 ```bash
-# Install
+python --version  # Must be 3.12+
 pip install -r requirements.txt
+```
 
-# Run with local LLM (LM Studio must be running)
-python -m src.main export_data/your-export/conversations.json
+### Get Your Export Data
 
-# Run tests
+- **ChatGPT:** Settings → Data Controls → Export Data → Download `conversations.json`
+- **Claude:** Settings → Export Data → Download folder with `conversations.json` + `memories.json`
+
+### Run Extraction
+
+**Option 1: Local LLM (requires [LM Studio](https://lmstudio.ai))**
+
+```bash
+# Start LM Studio with Hermes 4 70B at http://127.0.0.1:1234
+python -m src.main path/to/conversations.json --provider local
+```
+
+**Option 2: Anthropic API**
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+python -m src.main path/to/conversations.json --provider api
+```
+
+**Option 3: Demo Mode (test with first chunk only)**
+
+```bash
+python -m src.main path/to/conversations.json --demo --provider local
+```
+
+### CLI Reference
+
+```bash
+python -m src.main --help                    # Show all options
+python -m src.main input.json --demo         # Test mode (4k tokens, 1 chunk)
+python -m src.main input.json --resume       # Resume interrupted run
+python -m src.main input.json --provider api # Use Claude API (parallel)
+```
+
+### Run Tests
+
+```bash
 pytest tests/ -v
 ```
 

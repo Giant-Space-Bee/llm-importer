@@ -5,6 +5,25 @@
 Extract memories from ChatGPT export → `memory-profile.md` + `.json` for new AI.
 No vector DBs, no Mem0, no KV stores. Just LLMs + string matching.
 
+## Quick CLI Commands
+
+```bash
+# Demo mode (first chunk, 4k tokens) - use for testing
+python -m src.main path/to/conversations.json --demo --provider local
+
+# Full run with local LLM
+python -m src.main path/to/conversations.json --provider local
+
+# Full run with API (parallel processing)
+python -m src.main path/to/conversations.json --provider api
+
+# Resume interrupted run
+python -m src.main path/to/conversations.json --resume --provider local
+
+# Show all options
+python -m src.main --help
+```
+
 ## Pipeline
 ```
 conversations.json → Parse → Chunk(65536) → Extract(LLM) → Verify → Aggregate → Dedup(LLM) → Distill(LLM) → Output
