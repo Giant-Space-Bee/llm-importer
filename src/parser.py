@@ -184,6 +184,79 @@ def filter_user_messages(messages: List[Message]) -> List[Message]:
     return [m for m in messages if m.role == "user" and not m.is_hidden]
 
 
+# --- Claude export parsing ---
+
+def _parse_iso_timestamp(iso_str: str) -> float:
+    """Convert ISO timestamp string to Unix timestamp."""
+    from datetime import datetime
+    try:
+        # Handle ISO format with microseconds and Z suffix
+        if iso_str.endswith("Z"):
+            iso_str = iso_str[:-1] + "+00:00"
+        dt = datetime.fromisoformat(iso_str)
+        return dt.timestamp()
+    except (ValueError, AttributeError):
+        return 0.0
+
+
+def _parse_claude_message(msg_data: Dict[str, Any]) -> Optional[Message]:
+    """Parse a Claude message dict into a Message object."""
+    if msg_data is None:
+        return None
+
+    # Map Claude's "human" to our "user" role
+    sender = msg_data.get("sender", "unknown")
+    role = "user" if sender == "human" else sender
+
+    # Get text from content array or top-level text field
+    content = ""
+    content_parts = msg_data.get("content", [])
+    if content_parts:
+        # Join all text parts
+        content = "".join(
+            part.get("text", "") for part in content_parts
+            if isinstance(part, dict)
+        )
+    # Fallback to top-level text
+    if not content:
+        content = msg_data.get("text", "")
+
+    # Parse ISO timestamp
+    timestamp = _parse_iso_timestamp(msg_data.get("created_at", ""))
+
+    return Message(
+        id=msg_data.get("uuid", ""),
+        role=role,
+        content=content,
+        timestamp=timestamp,
+        is_hidden=False  # Claude exports don't have hidden messages
+    )
+
+
+def parse_claude_conversation(convo_data: Dict[str, Any]) -> Conversation:
+    """Parse a single Claude conversation into our Conversation format."""
+    messages = []
+    for msg_data in convo_data.get("chat_messages", []):
+        msg = _parse_claude_message(msg_data)
+        if msg is not None:
+            messages.append(msg)
+
+    # Parse create_time from ISO format
+    create_time = _parse_iso_timestamp(convo_data.get("created_at", ""))
+
+    return Conversation(
+        id=convo_data.get("uuid", ""),
+        title=convo_data.get("name", "") or "Untitled",
+        create_time=create_time,
+        messages=messages
+    )
+
+
+def parse_claude_conversations(raw: List[Dict[str, Any]]) -> List[Conversation]:
+    """Parse all Claude conversations."""
+    return [parse_claude_conversation(convo) for convo in raw]
+
+
 def extract_user_profile(conversations: List[Dict[str, Any]]) -> Optional[UserProfile]:
     """
     Extract user_editable_context from conversations.
@@ -257,17 +330,8 @@ def get_stats_from_parsed(conversations: List[Conversation], user_profile: Optio
     )
 
 
-def parse_all(path: str) -> tuple[List[Conversation], Optional[UserProfile]]:
-    """
-    Main entry point: parse everything.
-
-    Returns:
-        - List of linearized Conversations
-        - UserProfile if found (free wins from custom instructions)
-    """
-    raw = load_conversations(path)
-    user_profile = extract_user_profile(raw)
-
+def parse_chatgpt_conversations(raw: List[Dict[str, Any]]) -> List[Conversation]:
+    """Parse all ChatGPT conversations."""
     conversations = []
     for convo_data in raw:
         mapping = convo_data.get("mapping", {})
@@ -276,9 +340,33 @@ def parse_all(path: str) -> tuple[List[Conversation], Optional[UserProfile]]:
         convo = Conversation(
             id=convo_data.get("id", ""),
             title=convo_data.get("title", "Untitled"),
-            create_time=convo_data.get("create_time", 0.0),
+            create_time=convo_data.get("create_time", 0.0) or 0.0,
             messages=messages
         )
         conversations.append(convo)
+    return conversations
+
+
+def parse_all(path: str) -> tuple[List[Conversation], Optional[UserProfile]]:
+    """
+    Main entry point: parse everything.
+
+    Auto-detects export type (ChatGPT vs Claude) and uses the appropriate parser.
+
+    Returns:
+        - List of linearized Conversations
+        - UserProfile if found (ChatGPT custom instructions only)
+    """
+    raw = load_conversations(path)
+    export_type = detect_export_type(raw)
+
+    if export_type == "chatgpt":
+        conversations = parse_chatgpt_conversations(raw)
+        user_profile = extract_user_profile(raw)
+    elif export_type == "claude":
+        conversations = parse_claude_conversations(raw)
+        user_profile = None  # Claude doesn't have user_editable_context
+    else:
+        raise ValueError(f"Unknown export type. Expected ChatGPT or Claude format.")
 
     return conversations, user_profile

@@ -25,20 +25,32 @@ def conversation_to_text(conversation: Any) -> str:
     Convert a conversation (dict or text) to a searchable text string.
 
     Handles:
-    - Raw conversation dict with 'mapping' field -> flatten and join message texts
+    - Raw ChatGPT conversation dict with 'mapping' field -> flatten and join message texts
+    - Raw Claude conversation dict with 'chat_messages' field -> join message texts
     - Already-text string -> return as-is
 
     Returns:
         Concatenated text of all messages in the conversation
     """
+    from src.parser import _parse_claude_message
+
     # Already a string
     if isinstance(conversation, str):
         return conversation
 
-    # Raw conversation dict - flatten tree and join content
+    # ChatGPT: Raw conversation dict with mapping tree
     if isinstance(conversation, dict) and "mapping" in conversation:
         messages = flatten_tree(conversation["mapping"])
         return "\n".join(msg.content for msg in messages if msg.content)
+
+    # Claude: Raw conversation dict with chat_messages array
+    if isinstance(conversation, dict) and "chat_messages" in conversation:
+        texts = []
+        for msg_data in conversation.get("chat_messages", []):
+            msg = _parse_claude_message(msg_data)
+            if msg and msg.content:
+                texts.append(msg.content)
+        return "\n".join(texts)
 
     # Unknown format
     return ""

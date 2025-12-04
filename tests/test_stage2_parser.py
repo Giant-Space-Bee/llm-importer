@@ -317,3 +317,157 @@ class TestConversation:
         assert convo.title == "Test Conversation"
         assert convo.create_time == 1700000000.0
         assert convo.messages == []
+
+
+# --- Stage 6i: Claude export parsing tests ---
+
+from src.parser import (
+    detect_export_type,
+    parse_all,
+    parse_claude_conversations,
+    parse_claude_conversation,
+    _parse_claude_message,
+    _parse_iso_timestamp,
+)
+
+
+class TestDetectExportType:
+    """detect_export_type() identifies ChatGPT vs Claude exports."""
+
+    def test_detects_chatgpt(self):
+        """Should detect ChatGPT export by 'mapping' field."""
+        data = [{"id": "test", "mapping": {"root": {}}}]
+        assert detect_export_type(data) == "chatgpt"
+
+    def test_detects_claude(self):
+        """Should detect Claude export by 'uuid' and 'chat_messages' fields."""
+        data = [{"uuid": "test", "chat_messages": []}]
+        assert detect_export_type(data) == "claude"
+
+    def test_returns_unknown_for_empty(self):
+        """Should return 'unknown' for empty list."""
+        assert detect_export_type([]) == "unknown"
+
+    def test_returns_unknown_for_unrecognized(self):
+        """Should return 'unknown' for unrecognized format."""
+        data = [{"some_field": "value"}]
+        assert detect_export_type(data) == "unknown"
+
+
+class TestParseIsoTimestamp:
+    """_parse_iso_timestamp() converts ISO strings to Unix timestamps."""
+
+    def test_parses_iso_with_z(self):
+        """Should handle ISO format with Z suffix."""
+        ts = _parse_iso_timestamp("2025-12-01T06:01:43.108834Z")
+        assert ts > 0
+
+    def test_parses_iso_with_timezone(self):
+        """Should handle ISO format with timezone offset."""
+        ts = _parse_iso_timestamp("2025-12-01T06:01:43.108834+00:00")
+        assert ts > 0
+
+    def test_returns_zero_for_invalid(self):
+        """Should return 0 for invalid strings."""
+        assert _parse_iso_timestamp("not a date") == 0.0
+        assert _parse_iso_timestamp("") == 0.0
+
+
+class TestParseClaudeMessage:
+    """_parse_claude_message() converts Claude message dicts to Message objects."""
+
+    def test_parses_human_message(self):
+        """Should parse human message with content array."""
+        msg_data = {
+            "uuid": "msg-1",
+            "sender": "human",
+            "content": [{"type": "text", "text": "Hello Claude"}],
+            "created_at": "2025-12-01T06:01:44.304455Z"
+        }
+        msg = _parse_claude_message(msg_data)
+
+        assert msg is not None
+        assert msg.id == "msg-1"
+        assert msg.role == "user"  # human -> user
+        assert msg.content == "Hello Claude"
+        assert msg.timestamp > 0
+
+    def test_parses_assistant_message(self):
+        """Should parse assistant message."""
+        msg_data = {
+            "uuid": "msg-2",
+            "sender": "assistant",
+            "content": [{"type": "text", "text": "Hello human"}],
+            "created_at": "2025-12-01T06:02:00Z"
+        }
+        msg = _parse_claude_message(msg_data)
+
+        assert msg.role == "assistant"
+
+    def test_uses_top_level_text_fallback(self):
+        """Should use top-level text field if content array is empty."""
+        msg_data = {
+            "uuid": "msg-3",
+            "sender": "human",
+            "text": "Fallback text",
+            "content": [],
+            "created_at": "2025-12-01T06:00:00Z"
+        }
+        msg = _parse_claude_message(msg_data)
+
+        assert msg.content == "Fallback text"
+
+
+class TestParseClaudeConversation:
+    """parse_claude_conversation() converts Claude conversation dicts to Conversation objects."""
+
+    def test_parses_conversation(self):
+        """Should parse a complete Claude conversation."""
+        convo_data = {
+            "uuid": "convo-1",
+            "name": "Test Conversation",
+            "created_at": "2025-12-01T06:00:00Z",
+            "chat_messages": [
+                {"uuid": "msg-1", "sender": "human", "content": [{"text": "Hi"}], "created_at": "2025-12-01T06:00:01Z"},
+                {"uuid": "msg-2", "sender": "assistant", "content": [{"text": "Hello"}], "created_at": "2025-12-01T06:00:02Z"},
+            ]
+        }
+        convo = parse_claude_conversation(convo_data)
+
+        assert convo.id == "convo-1"
+        assert convo.title == "Test Conversation"
+        assert len(convo.messages) == 2
+        assert convo.messages[0].role == "user"
+        assert convo.messages[1].role == "assistant"
+
+    def test_handles_empty_name(self):
+        """Should use 'Untitled' for empty name."""
+        convo_data = {
+            "uuid": "convo-1",
+            "name": "",
+            "created_at": "2025-12-01T06:00:00Z",
+            "chat_messages": []
+        }
+        convo = parse_claude_conversation(convo_data)
+
+        assert convo.title == "Untitled"
+
+
+class TestParseAllUnified:
+    """parse_all() auto-detects format and parses appropriately."""
+
+    def test_parses_chatgpt_export(self, conversations_file):
+        """Should parse ChatGPT export with user profile."""
+        convos, profile = parse_all(str(conversations_file))
+
+        assert len(convos) >= 400
+        assert profile is not None
+
+    def test_raises_for_unknown_format(self, tmp_path):
+        """Should raise ValueError for unknown format."""
+        # Create file with unrecognized format
+        unknown_file = tmp_path / "unknown.json"
+        unknown_file.write_text('[{"weird_field": "value"}]')
+
+        with pytest.raises(ValueError, match="Unknown export type"):
+            parse_all(str(unknown_file))

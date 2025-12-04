@@ -29,10 +29,17 @@
   - [x] 6g: Checkpointing (14 tests) - save/resume after each chunk
   - [x] 6h: Integration test with full pipeline - 14 facts verified from 1 chunk via Claude API
 
+- [x] Stage 6i: Claude export parsing (13 new tests)
+  - [x] Auto-detect export type in parse_all() (mapping=ChatGPT, chat_messages=Claude)
+  - [x] Add parse_claude() for Claude's flat message array format
+  - [x] Update parse_chatgpt() (rename from current parse_all logic)
+  - [x] Tests for both export types (13 tests added)
+  - [x] Verifier handles both raw conversation formats
+
 ## Pending
 - [ ] Stage 7: Aggregator (combine + count)
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
 
 ## Test Count
-134 tests passing
+147 tests passing
