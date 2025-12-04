@@ -319,3 +319,208 @@ class TestAPIProviderErrorHandling:
             provider = APIProvider()
             with pytest.raises(RuntimeError, match="JSON"):
                 provider.complete_structured("Test", {"type": "object"})
+
+
+class TestAPIProviderTPMAdaptiveChunking:
+    """TPM-aware adaptive chunk size and parallelism calculations."""
+
+    def test_get_safe_chunk_size_tier1(self):
+        """Tier 1 (30k TPM) should use 20k chunks."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=30000)
+            # 30k - 10k reserve = 20k
+            assert provider.get_safe_chunk_size() == 20000
+
+    def test_get_safe_chunk_size_high_tpm(self):
+        """High TPM should cap at max chunk size (65536)."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=200000)
+            # 200k - 10k = 190k, but capped at 65536
+            assert provider.get_safe_chunk_size() == 65536
+
+    def test_get_safe_chunk_size_medium_tpm(self):
+        """Medium TPM (80k) should use full 65k chunks."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=80000)
+            # 80k - 10k = 70k, capped at 65536
+            assert provider.get_safe_chunk_size() == 65536
+
+    def test_get_safe_chunk_size_very_low_tpm(self):
+        """Very low TPM should use minimum viable chunk size (4096)."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=10000)
+            # 10k - 10k = 0, but floored at 4096
+            assert provider.get_safe_chunk_size() == 4096
+
+    def test_get_max_concurrent_tier1(self):
+        """Tier 1 (30k TPM) should be sequential (1 concurrent)."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=30000)
+            # 30k / (20k + 10k) = 1
+            assert provider.get_max_concurrent() == 1
+
+    def test_get_max_concurrent_high_tpm(self):
+        """High TPM (200k) should allow parallel processing."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=200000)
+            # 200k / (65k + 10k) ≈ 2.6 → 2
+            assert provider.get_max_concurrent() == 2
+
+    def test_get_max_concurrent_very_high_tpm(self):
+        """Very high TPM should cap at 5 concurrent."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=500000)
+            # 500k / (65k + 10k) ≈ 6.6, but capped at 5
+            assert provider.get_max_concurrent() == 5
+
+    def test_adaptive_methods_exist(self):
+        """APIProvider should have get_safe_chunk_size and get_max_concurrent."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            assert hasattr(provider, "get_safe_chunk_size")
+            assert hasattr(provider, "get_max_concurrent")
+            assert callable(provider.get_safe_chunk_size)
+            assert callable(provider.get_max_concurrent)
+
+
+class TestAPIProviderTokenEstimation:
+    """Token estimation for proactive rate limiting."""
+
+    def test_estimate_tokens_exists(self):
+        """Should have _estimate_tokens method."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            assert hasattr(provider, "_estimate_tokens")
+            assert callable(provider._estimate_tokens)
+
+    def test_estimate_tokens_short_prompt(self):
+        """Short prompt should estimate tokens correctly."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            # 40 chars / 4 = 10 tokens + 10000 reserve = 10010
+            result = provider._estimate_tokens("a" * 40)
+            assert result == 10010
+
+    def test_estimate_tokens_long_prompt(self):
+        """Long prompt should scale correctly."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            # 80000 chars / 4 = 20000 tokens + 10000 reserve = 30000
+            result = provider._estimate_tokens("a" * 80000)
+            assert result == 30000
+
+    def test_estimate_tokens_includes_reserve(self):
+        """Estimate should always include output reserve."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            # Even empty prompt should have reserve
+            result = provider._estimate_tokens("")
+            assert result == 10000  # Just the reserve
+
+
+class TestAPIProviderRetryBehavior:
+    """Retry with exponential backoff on rate limit errors."""
+
+    def test_call_with_retry_exists(self):
+        """Should have _call_with_retry method."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            assert hasattr(provider, "_call_with_retry")
+            assert callable(provider._call_with_retry)
+
+    def test_call_with_retry_success_first_try(self):
+        """Should return result on successful first attempt."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            call_fn = MagicMock(return_value="success")
+
+            result = provider._call_with_retry(call_fn, "test prompt")
+
+            assert result == "success"
+            assert call_fn.call_count == 1
+
+    @patch("time.sleep")
+    def test_call_with_retry_retries_on_rate_limit(self, mock_sleep):
+        """Should retry on RateLimitError."""
+        import anthropic
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            # Fail first, succeed second
+            call_fn = MagicMock(
+                side_effect=[
+                    anthropic.RateLimitError(
+                        message="rate limited",
+                        response=MagicMock(status_code=429),
+                        body={}
+                    ),
+                    "success"
+                ]
+            )
+
+            result = provider._call_with_retry(call_fn, "test prompt")
+
+            assert result == "success"
+            assert call_fn.call_count == 2
+            mock_sleep.assert_called()  # Should have slept
+
+    @patch("time.sleep")
+    def test_call_with_retry_exponential_backoff(self, mock_sleep):
+        """Should use exponential backoff: 5s, 10s, 20s."""
+        import anthropic
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            # Fail twice, succeed third
+            rate_limit_error = anthropic.RateLimitError(
+                message="rate limited",
+                response=MagicMock(status_code=429),
+                body={}
+            )
+            call_fn = MagicMock(
+                side_effect=[rate_limit_error, rate_limit_error, "success"]
+            )
+
+            result = provider._call_with_retry(call_fn, "test prompt")
+
+            assert result == "success"
+            assert call_fn.call_count == 3
+            # Check backoff times (5s, 10s)
+            sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
+            assert 5 in sleep_calls
+            assert 10 in sleep_calls
+
+    @patch("time.sleep")
+    def test_call_with_retry_max_retries_exceeded(self, mock_sleep):
+        """Should raise RuntimeError after MAX_RETRIES failures."""
+        import anthropic
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            rate_limit_error = anthropic.RateLimitError(
+                message="rate limited",
+                response=MagicMock(status_code=429),
+                body={}
+            )
+            call_fn = MagicMock(side_effect=rate_limit_error)
+
+            with pytest.raises(RuntimeError, match="Rate limit exceeded after 3 retries"):
+                provider._call_with_retry(call_fn, "test prompt")
+
+            assert call_fn.call_count == 3
+
+    @patch("time.sleep")
+    def test_call_with_retry_uses_token_estimation(self, mock_sleep):
+        """Should pass estimated tokens to rate limiter."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            provider._wait_for_rate_limit = MagicMock()
+            call_fn = MagicMock(return_value="success")
+
+            # Long prompt = more estimated tokens
+            long_prompt = "a" * 40000  # 10000 tokens + 10000 reserve = 20000
+
+            provider._call_with_retry(call_fn, long_prompt)
+
+            # Should have called wait with estimated tokens
+            provider._wait_for_rate_limit.assert_called_with(estimated_tokens=20000)

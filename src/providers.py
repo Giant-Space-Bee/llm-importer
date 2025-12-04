@@ -16,9 +16,12 @@ Stage 6:
 
 import json
 import os
+import sys
 import time
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Callable, Optional, TypeVar
+
+T = TypeVar("T")
 
 import anthropic
 import httpx
@@ -28,6 +31,16 @@ DEFAULT_TEMPERATURE = 0.3  # Lower = more deterministic for extraction
 DEFAULT_MAX_TOKENS = 8192  # Plenty of room for extracted facts
 SECONDS_PER_MINUTE = 60
 RATE_LIMIT_BUFFER = 0.1  # Buffer in seconds for rate limit waits
+
+# TPM-adaptive chunking constants
+OUTPUT_RESERVE = 10000  # Reserved for output tokens (8k output + 2k safety)
+MIN_CHUNK_SIZE = 4096   # Minimum viable chunk size
+MAX_CHUNK_SIZE = 65536  # Default/maximum chunk size (2^16)
+MAX_CONCURRENT = 5      # Maximum parallel requests
+
+# Retry constants for rate limit handling
+MAX_RETRIES = 3         # Number of retry attempts on rate limit
+INITIAL_BACKOFF = 5     # Initial backoff in seconds (5s, 10s, 20s)
 
 
 class LLMProvider(ABC):
@@ -246,40 +259,90 @@ class APIProvider(LLMProvider):
         self._requests_this_minute += 1
         self._tokens_this_minute += input_tokens + output_tokens
 
+    def _estimate_tokens(self, prompt: str) -> int:
+        """
+        Rough token estimate for rate limit pre-checking.
+
+        Uses ~4 chars per token heuristic plus output reserve.
+        Conservative: better to overestimate than underestimate.
+        """
+        return len(prompt) // 4 + OUTPUT_RESERVE
+
+    def _call_with_retry(
+        self, call_fn: Callable[[], T], prompt: str
+    ) -> T:
+        """
+        Execute API call with proactive rate limiting and retry on 429.
+
+        Layer 1: Pre-estimate tokens and wait if needed (proactive)
+        Layer 2: Retry with exponential backoff on rate limit (reactive)
+
+        Args:
+            call_fn: Zero-arg callable that makes the actual API call
+            prompt: The prompt text (used for token estimation)
+
+        Returns:
+            Result from call_fn
+
+        Raises:
+            RuntimeError: After MAX_RETRIES failed attempts
+        """
+        estimated = self._estimate_tokens(prompt)
+
+        for attempt in range(MAX_RETRIES):
+            self._wait_for_rate_limit(estimated_tokens=estimated)
+
+            try:
+                return call_fn()
+            except anthropic.RateLimitError as e:
+                if attempt == MAX_RETRIES - 1:
+                    raise RuntimeError(
+                        f"Rate limit exceeded after {MAX_RETRIES} retries: {e}"
+                    )
+
+                backoff = INITIAL_BACKOFF * (2 ** attempt)  # 5s, 10s, 20s
+                print(
+                    f"[Rate limit hit, waiting {backoff}s before retry {attempt + 2}]",
+                    file=sys.stderr,
+                )
+                time.sleep(backoff)
+                self._maybe_reset_minute()
+
+        # Should never reach here, but satisfy type checker
+        raise RuntimeError("Retry loop exited unexpectedly")
+
     def complete(self, prompt: str) -> str:
         """
         Send prompt to Claude API, get response text.
 
-        Respects rate limits automatically.
+        Uses proactive rate limiting and retry on 429.
         """
-        self._wait_for_rate_limit()
-
-        try:
+        def _do_call() -> str:
             response = self._client.messages.create(
                 model=self.model,
                 max_tokens=DEFAULT_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}]
             )
-
             self._update_usage(
                 response.usage.input_tokens,
                 response.usage.output_tokens
             )
-
             return response.content[0].text
 
+        try:
+            return self._call_with_retry(_do_call, prompt)
         except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise  # Already wrapped
             raise RuntimeError(f"Anthropic API error: {e}")
 
     def complete_structured(self, prompt: str, schema: dict) -> dict:
         """
         Send prompt with JSON schema, get parsed dict back.
 
-        Uses Anthropic's structured outputs beta.
+        Uses Anthropic's structured outputs beta with retry on 429.
         """
-        self._wait_for_rate_limit()
-
-        try:
+        def _do_call() -> dict:
             response = self._client.beta.messages.create(
                 model=self.model,
                 max_tokens=DEFAULT_MAX_TOKENS,
@@ -290,16 +353,49 @@ class APIProvider(LLMProvider):
                     "schema": schema
                 }
             )
-
             self._update_usage(
                 response.usage.input_tokens,
                 response.usage.output_tokens
             )
-
             content = response.content[0].text
             return json.loads(content)
 
+        try:
+            return self._call_with_retry(_do_call, prompt)
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Invalid JSON from Claude API: {e}")
         except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise  # Already wrapped
             raise RuntimeError(f"Anthropic API error: {e}")
+
+    def get_safe_chunk_size(self) -> int:
+        """
+        Calculate chunk size that fits within TPM limit.
+
+        Formula: safe = tpm - output_reserve, clamped to [MIN, MAX]
+
+        Examples:
+            TPM 30k → 20k chunks (Tier 1)
+            TPM 80k → 65k chunks (capped at max)
+        """
+        safe = self.tpm - OUTPUT_RESERVE
+        safe = max(MIN_CHUNK_SIZE, safe)
+        safe = min(MAX_CHUNK_SIZE, safe)
+        return safe
+
+    def get_max_concurrent(self) -> int:
+        """
+        Calculate optimal parallelism for this TPM limit.
+
+        Formula: concurrent = tpm / (chunk_size + output_reserve), capped at MAX_CONCURRENT
+
+        Examples:
+            TPM 30k → 1 (sequential)
+            TPM 200k → 2 parallel
+            TPM 400k → 5 parallel (capped)
+        """
+        chunk_size = self.get_safe_chunk_size()
+        tokens_per_request = chunk_size + OUTPUT_RESERVE
+        concurrent = max(1, self.tpm // tokens_per_request)
+        return min(concurrent, MAX_CONCURRENT)

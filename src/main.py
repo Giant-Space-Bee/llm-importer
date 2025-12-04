@@ -460,6 +460,12 @@ def main():
         action="store_true",
         help="Resume from checkpoint"
     )
+    parser.add_argument(
+        "--tpm",
+        type=int,
+        default=None,
+        help="Tokens per minute limit for API mode (default: 20000 for Tier 1)"
+    )
     args = parser.parse_args()
 
     console = Console()
@@ -485,10 +491,11 @@ def main():
 
     # Load raw conversations for verification (need full message tree)
     raw_convos = load_conversations(input_file)
-    conversations_by_id = {c["id"]: c for c in raw_convos}
 
-    # Detect export type for Claude memories
+    # Detect export type first - needed for ID field selection
     export_type = detect_export_type(raw_convos)
+    id_field = "uuid" if export_type == "claude" else "id"
+    conversations_by_id = {c[id_field]: c for c in raw_convos}
 
     # Show stats table
     table = Table(title="Conversation Stats", show_header=False)
@@ -534,8 +541,29 @@ def main():
         trusted_context = format_user_profile_for_distiller(user_profile)
         console.print("\n[bold green]Using custom instructions as trusted baseline[/bold green]")
 
+    # Select provider first (needed for TPM-aware chunking)
+    provider = select_provider(console, args.provider)
+
+    # Calculate chunk size based on provider type and TPM
+    max_concurrent = 1  # Default for local
+    if args.demo:
+        chunk_size = DEMO_CHUNK_SIZE
+    elif isinstance(provider, APIProvider):
+        # Apply TPM override if specified
+        if args.tpm:
+            provider.tpm = args.tpm
+        # Calculate adaptive chunk size and parallelism
+        chunk_size = provider.get_safe_chunk_size()
+        max_concurrent = provider.get_max_concurrent()
+        console.print(
+            f"[dim]TPM: {provider.tpm:,} → chunk size: {chunk_size:,}, "
+            f"concurrent: {max_concurrent}[/dim]"
+        )
+    else:
+        # Local LLM: use full chunks
+        chunk_size = DEFAULT_CHUNK_SIZE
+
     # Chunk conversations
-    chunk_size = DEMO_CHUNK_SIZE if args.demo else DEFAULT_CHUNK_SIZE
     console.print(f"\n[bold]Chunking conversations...[/bold] (max {chunk_size:,} tokens)")
     chunks = chunk_conversations(conversations, max_tokens=chunk_size)
 
@@ -565,9 +593,6 @@ def main():
             f"{sum(c.token_count for c in chunks):,}"
         )
     console.print(chunk_table)
-
-    # Select provider
-    provider = select_provider(console, args.provider)
 
     # Compute remaining chunks
     if args.resume and completed_chunks:
@@ -600,8 +625,10 @@ def main():
         else:
             # API: parallel processing, checkpoint at end
             start_time = time.time()
-            console.print("[dim]Processing in parallel...[/dim]")
-            new_facts = process_all_chunks(chunks, provider, conversations_by_id)
+            console.print(f"[dim]Processing in parallel (max {max_concurrent} concurrent)...[/dim]")
+            new_facts = process_all_chunks(
+                chunks, provider, conversations_by_id, max_concurrent=max_concurrent
+            )
             elapsed = time.time() - start_time
             console.print(
                 f"  [green]Extracted {len(new_facts)} verified facts[/green] "
