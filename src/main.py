@@ -12,6 +12,10 @@ Usage:
     python -m src.main --resume           # Resume from checkpoint
 """
 
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env file (for ANTHROPIC_API_KEY, etc.)
+
 import argparse
 import hashlib
 import time
