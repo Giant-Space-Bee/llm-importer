@@ -99,8 +99,8 @@ pytest tests/ -v
 
 **Active Development** - Core pipeline complete (Stages 1-7), semantic deduplication in progress.
 
-- 190 tests passing
-- 16 source modules (modular `parsers/` package)
+- Comprehensive test suite
+- Modular architecture (`src/parsers/` package)
 - Supports both ChatGPT and Claude exports
 
 ## License
