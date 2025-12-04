@@ -145,11 +145,9 @@ def format_user_profile_for_distiller(profile: UserProfile) -> str:
     sections = []
 
     if profile.user_profile:
-        sections.append("## About the User\n")
-        sections.append(profile.user_profile)
+        sections.append("## About the User\n\n" + profile.user_profile)
 
     if profile.user_instructions:
-        sections.append("\n## User Preferences\n")
-        sections.append(profile.user_instructions)
+        sections.append("## User Preferences\n\n" + profile.user_instructions)
 
-    return "\n".join(sections)
+    return "\n\n".join(sections)
