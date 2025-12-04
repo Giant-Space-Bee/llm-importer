@@ -220,7 +220,7 @@ response = client.beta.messages.create(
 
 ## Project Stats
 - **Source data:** 450 convos, 17M chars (~4.3M tokens), 6,208 user messages, 367 user_editable_context blocks
-- **Test coverage:** 173 tests (Stage 1-7 complete; Stage 8-9 stubs)
+- **Test coverage:** 176 tests, 0 skipped (Stage 1-7 complete; Stage 8-9 stubs)
 - **Modules:** 11 src files (providers, parser, chunker, extractor, verifier, aggregator, checkpoint, processor, deduplicator, distiller, main)
 
 ## Stage 5 Verifier Findings (2025-12-03)

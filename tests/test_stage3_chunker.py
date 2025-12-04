@@ -205,36 +205,62 @@ class TestChunkConversations:
             assert chunk.id == i
 
 
-class TestChunkConversationsWithRealData:
-    """Test chunking with the real conversations.json file."""
+class TestChunkConversationsWithFixtures:
+    """Test chunking with fixture files."""
 
-    def test_chunks_real_data(self, conversations_file):
-        """Should chunk the real 450 conversations into reasonable batches."""
-        convos, _ = parse_all(str(conversations_file))
+    def test_chunks_chatgpt_fixture(self, chatgpt_fixture):
+        """Should chunk the ChatGPT fixture."""
+        convos, _ = parse_all(str(chatgpt_fixture))
 
         chunks = chunk_conversations(convos, max_tokens=65536)
 
-        # Should produce multiple chunks (data is ~1.6M tokens)
-        assert len(chunks) > 1
+        # Small fixture should fit in one chunk
+        assert len(chunks) == 1
 
         # Should cover all conversations
         total_convos = sum(len(c.conversations) for c in chunks)
-        assert total_convos == 450
+        assert total_convos == 3
 
         # Each chunk should have token count set
         for chunk in chunks:
             assert chunk.token_count > 0
 
-    def test_chunk_sizes_are_reasonable(self, conversations_file):
-        """Most chunks should be close to max_tokens (efficient packing)."""
-        convos, _ = parse_all(str(conversations_file))
+    def test_chunks_claude_fixture(self, claude_fixture):
+        """Should chunk the Claude fixture."""
+        convos, _ = parse_all(str(claude_fixture))
 
         chunks = chunk_conversations(convos, max_tokens=65536)
 
-        # At least half the chunks should be at least 50% full
-        # (unless they contain a single huge conversation)
-        well_packed = sum(
-            1 for c in chunks
-            if c.token_count >= 32768 or len(c.conversations) == 1
-        )
-        assert well_packed >= len(chunks) // 2
+        # Small fixture should fit in one chunk
+        assert len(chunks) == 1
+
+        # Should cover all conversations
+        total_convos = sum(len(c.conversations) for c in chunks)
+        assert total_convos == 3
+
+    def test_chunks_into_multiple_batches(self, chatgpt_fixture):
+        """Should split conversations into multiple chunks with small token limit."""
+        convos, _ = parse_all(str(chatgpt_fixture))
+
+        # Use small limit to force multiple chunks
+        chunks = chunk_conversations(convos, max_tokens=100)
+
+        # Should produce multiple chunks
+        assert len(chunks) > 1
+
+        # Should cover all conversations
+        total_convos = sum(len(c.conversations) for c in chunks)
+        assert total_convos == 3
+
+        # Each chunk has token count
+        for chunk in chunks:
+            assert chunk.token_count > 0
+
+    def test_chunk_token_limits_respected(self, chatgpt_fixture):
+        """Chunks should not exceed max_tokens (unless single oversized convo)."""
+        convos, _ = parse_all(str(chatgpt_fixture))
+        chunks = chunk_conversations(convos, max_tokens=100)
+
+        for chunk in chunks:
+            # Either under limit or single conversation
+            assert chunk.token_count <= 100 or len(chunk.conversations) == 1

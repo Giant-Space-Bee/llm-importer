@@ -1,0 +1,171 @@
+[
+  {
+    "id": "chatgpt-conv-1",
+    "title": "Hobbies Discussion",
+    "create_time": 1700000000.0,
+    "update_time": 1700000100.0,
+    "mapping": {
+      "root-1": {
+        "id": "root-1",
+        "message": null,
+        "parent": null,
+        "children": ["ctx-1", "msg-1"]
+      },
+      "ctx-1": {
+        "id": "ctx-1",
+        "message": {
+          "id": "ctx-1",
+          "author": {"role": "user"},
+          "content": {
+            "content_type": "user_editable_context",
+            "user_profile": "Name: Test User\nRole: Software Developer\nLocation: Seattle",
+            "user_instructions": "Be concise and technical"
+          },
+          "create_time": 1700000000.0,
+          "metadata": {"is_visually_hidden_from_conversation": true}
+        },
+        "parent": "root-1",
+        "children": []
+      },
+      "msg-1": {
+        "id": "msg-1",
+        "message": {
+          "id": "msg-1",
+          "author": {"role": "user"},
+          "content": {"content_type": "text", "parts": ["I love playing guitar and hiking on weekends."]},
+          "create_time": 1700000001.0,
+          "metadata": {}
+        },
+        "parent": "root-1",
+        "children": ["msg-2"]
+      },
+      "msg-2": {
+        "id": "msg-2",
+        "message": {
+          "id": "msg-2",
+          "author": {"role": "assistant"},
+          "content": {"content_type": "text", "parts": ["That sounds like a great combination of hobbies!"]},
+          "create_time": 1700000002.0,
+          "metadata": {}
+        },
+        "parent": "msg-1",
+        "children": ["msg-3"]
+      },
+      "msg-3": {
+        "id": "msg-3",
+        "message": {
+          "id": "msg-3",
+          "author": {"role": "user"},
+          "content": {"content_type": "text", "parts": ["Yes, I've been playing guitar for about 5 years now."]},
+          "create_time": 1700000003.0,
+          "metadata": {}
+        },
+        "parent": "msg-2",
+        "children": []
+      }
+    },
+    "current_node": "msg-3"
+  },
+  {
+    "id": "chatgpt-conv-2",
+    "title": "Work Discussion",
+    "create_time": 1700100000.0,
+    "update_time": 1700100100.0,
+    "mapping": {
+      "root-2": {
+        "id": "root-2",
+        "message": null,
+        "parent": null,
+        "children": ["msg-4"]
+      },
+      "msg-4": {
+        "id": "msg-4",
+        "message": {
+          "id": "msg-4",
+          "author": {"role": "user"},
+          "content": {"content_type": "text", "parts": ["I work as a senior developer at a tech startup in Seattle."]},
+          "create_time": 1700100001.0,
+          "metadata": {}
+        },
+        "parent": "root-2",
+        "children": ["msg-5"]
+      },
+      "msg-5": {
+        "id": "msg-5",
+        "message": {
+          "id": "msg-5",
+          "author": {"role": "assistant"},
+          "content": {"content_type": "text", "parts": ["Tech startups can be exciting environments."]},
+          "create_time": 1700100002.0,
+          "metadata": {}
+        },
+        "parent": "msg-4",
+        "children": ["msg-6"]
+      },
+      "msg-6": {
+        "id": "msg-6",
+        "message": {
+          "id": "msg-6",
+          "author": {"role": "user"},
+          "content": {"content_type": "text", "parts": ["We mainly build ML pipelines for data processing."]},
+          "create_time": 1700100003.0,
+          "metadata": {}
+        },
+        "parent": "msg-5",
+        "children": []
+      }
+    },
+    "current_node": "msg-6"
+  },
+  {
+    "id": "chatgpt-conv-3",
+    "title": "Family Chat",
+    "create_time": 1700200000.0,
+    "update_time": 1700200100.0,
+    "mapping": {
+      "root-3": {
+        "id": "root-3",
+        "message": null,
+        "parent": null,
+        "children": ["msg-7"]
+      },
+      "msg-7": {
+        "id": "msg-7",
+        "message": {
+          "id": "msg-7",
+          "author": {"role": "user"},
+          "content": {"content_type": "text", "parts": ["My daughter just started kindergarten this year."]},
+          "create_time": 1700200001.0,
+          "metadata": {}
+        },
+        "parent": "root-3",
+        "children": ["msg-8"]
+      },
+      "msg-8": {
+        "id": "msg-8",
+        "message": {
+          "id": "msg-8",
+          "author": {"role": "assistant"},
+          "content": {"content_type": "text", "parts": ["That's a big milestone! How is she adjusting?"]},
+          "create_time": 1700200002.0,
+          "metadata": {}
+        },
+        "parent": "msg-7",
+        "children": ["msg-9"]
+      },
+      "msg-9": {
+        "id": "msg-9",
+        "message": {
+          "id": "msg-9",
+          "author": {"role": "user"},
+          "content": {"content_type": "text", "parts": ["She loves it! Already made lots of friends."]},
+          "create_time": 1700200003.0,
+          "metadata": {}
+        },
+        "parent": "msg-8",
+        "children": []
+      }
+    },
+    "current_node": "msg-9"
+  }
+]

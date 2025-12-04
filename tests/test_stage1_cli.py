@@ -93,13 +93,12 @@ class TestFileValidation:
         assert result.valid is False
         assert result.error is not None
 
-    def test_real_conversations_file(self, conversations_file):
-        """Test against the actual 55MB conversations.json."""
-        result = validate_input_file(str(conversations_file))
+    def test_fixture_file(self, chatgpt_fixture):
+        """Test against the ChatGPT fixture file."""
+        result = validate_input_file(str(chatgpt_fixture))
 
         assert result.valid is True
-        assert result.size_bytes > 50_000_000  # Should be ~55MB
-        assert result.size_bytes < 100_000_000  # Sanity check
+        assert result.size_bytes > 0
 
 
 class TestFileSizeFormatting:

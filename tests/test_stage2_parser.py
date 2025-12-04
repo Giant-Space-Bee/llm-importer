@@ -43,12 +43,15 @@ class TestLoadConversations:
         assert len(result) == 1
         assert result[0]["id"] == "test"
 
-    def test_loads_real_conversations(self, conversations_file):
-        """Should load the actual 55MB file."""
-        result = load_conversations(str(conversations_file))
-        # We know from analysis: 450 conversations
-        assert len(result) >= 400
-        assert len(result) <= 500
+    def test_loads_chatgpt_fixture(self, chatgpt_fixture):
+        """Should load the ChatGPT fixture file."""
+        result = load_conversations(str(chatgpt_fixture))
+        assert len(result) == 3  # Our fixture has 3 conversations
+
+    def test_loads_claude_fixture(self, claude_fixture):
+        """Should load the Claude fixture file."""
+        result = load_conversations(str(claude_fixture))
+        assert len(result) == 3  # Our fixture has 3 conversations
 
     def test_raises_on_missing_file(self):
         """Should raise FileNotFoundError for missing files."""
@@ -246,38 +249,29 @@ class TestExtractUserProfile:
 class TestConversationStats:
     """get_conversation_stats() returns aggregate statistics."""
 
-    def test_counts_conversations(self, conversations_file):
-        """Should count total conversations."""
-        convos = load_conversations(str(conversations_file))
+    def test_counts_conversations_fixture(self, chatgpt_fixture):
+        """Should count total conversations from fixture."""
+        convos = load_conversations(str(chatgpt_fixture))
         stats = get_conversation_stats(convos)
 
-        assert stats.total_conversations >= 400
-        assert stats.total_conversations <= 500
+        assert stats.total_conversations == 3
 
-    def test_counts_messages(self, conversations_file):
-        """Should count total and user messages."""
-        convos = load_conversations(str(conversations_file))
+    def test_counts_messages_fixture(self, chatgpt_fixture):
+        """Should count total and user messages from fixture."""
+        convos = load_conversations(str(chatgpt_fixture))
         stats = get_conversation_stats(convos)
 
-        # Following main path (children[0]): ~7.5k messages, ~1.7k user messages
-        assert stats.total_messages > 5000
-        assert stats.user_messages > 1000
-        assert stats.user_messages < stats.total_messages
+        assert stats.total_messages > 0
+        assert stats.user_messages > 0
+        assert stats.user_messages <= stats.total_messages
+        assert stats.total_chars > 0  # Also verify char counting works
 
-    def test_calculates_total_chars(self, conversations_file):
-        """Should calculate total character count."""
-        convos = load_conversations(str(conversations_file))
+    def test_has_user_profile_flag_fixture(self, chatgpt_fixture):
+        """Should indicate if user_editable_context was found in fixture."""
+        convos = load_conversations(str(chatgpt_fixture))
         stats = get_conversation_stats(convos)
 
-        # Following main path: ~6.4M characters
-        assert stats.total_chars > 5_000_000
-
-    def test_has_user_profile_flag(self, conversations_file):
-        """Should indicate if user_editable_context was found."""
-        convos = load_conversations(str(conversations_file))
-        stats = get_conversation_stats(convos)
-
-        # We know Landon's export has user_editable_context
+        # Our fixture has user_editable_context
         assert stats.has_user_profile is True
 
 
@@ -456,12 +450,20 @@ class TestParseClaudeConversation:
 class TestParseAllUnified:
     """parse_all() auto-detects format and parses appropriately."""
 
-    def test_parses_chatgpt_export(self, conversations_file):
-        """Should parse ChatGPT export with user profile."""
-        convos, profile = parse_all(str(conversations_file))
+    def test_parses_chatgpt_fixture(self, chatgpt_fixture):
+        """Should parse ChatGPT fixture with user profile."""
+        convos, profile = parse_all(str(chatgpt_fixture))
 
-        assert len(convos) >= 400
+        assert len(convos) == 3
         assert profile is not None
+        assert "Test User" in profile.user_profile
+
+    def test_parses_claude_fixture(self, claude_fixture):
+        """Should parse Claude fixture."""
+        convos, profile = parse_all(str(claude_fixture))
+
+        assert len(convos) == 3
+        assert profile is None  # Claude format doesn't have user_editable_context
 
     def test_raises_for_unknown_format(self, tmp_path):
         """Should raise ValueError for unknown format."""
