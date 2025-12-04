@@ -174,11 +174,8 @@ class TestProcessAllChunks:
         provider = MockProvider(is_local=False)
         chunks = [make_test_chunk(0)]
 
-        with patch('src.processor.process_chunks_parallel') as mock_par:
-            # Mock the coroutine
-            async def async_return():
-                return []
-            mock_par.return_value = async_return()
+        with patch('src.processor.process_chunks_parallel', new_callable=AsyncMock) as mock_par:
+            mock_par.return_value = []
             process_all_chunks(chunks, provider)
 
         mock_par.assert_called_once()
