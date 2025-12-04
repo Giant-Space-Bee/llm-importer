@@ -39,7 +39,12 @@ from src.parser import (
     ExportType,
     ClaudeMemories,
 )
-from src.chunker import chunk_conversations, Chunk, DEFAULT_CHUNK_SIZE
+from src.chunker import (
+    chunk_conversations,
+    prepare_conversations,
+    Chunk,
+    DEFAULT_CHUNK_SIZE,
+)
 from src.providers import LocalProvider, APIProvider, LLMProvider
 from src.extractor import ExtractedFact
 from src.processor import extract_and_verify_chunk, process_all_chunks
@@ -562,6 +567,16 @@ def main():
     else:
         # Local LLM: use full chunks
         chunk_size = DEFAULT_CHUNK_SIZE
+
+    # For API mode: split oversized conversations first
+    if isinstance(provider, APIProvider) and not args.demo:
+        original_count = len(conversations)
+        conversations = prepare_conversations(conversations, chunk_size)
+        if len(conversations) > original_count:
+            console.print(
+                f"[yellow]Prepared:[/yellow] {original_count} conversations → "
+                f"{len(conversations)} (split oversized)"
+            )
 
     # Chunk conversations
     console.print(f"\n[bold]Chunking conversations...[/bold] (max {chunk_size:,} tokens)")

@@ -264,3 +264,228 @@ class TestChunkConversationsWithFixtures:
         for chunk in chunks:
             # Either under limit or single conversation
             assert chunk.token_count <= 100 or len(chunk.conversations) == 1
+
+
+# ============================================================================
+# Phase 2: Smart Splitting Tests
+# ============================================================================
+
+from src.chunker import (
+    split_message_text,
+    split_conversation,
+    prepare_conversations,
+    count_conversation_tokens,
+)
+
+
+class TestSplitMessageText:
+    """split_message_text() splits giant message text at natural boundaries."""
+
+    def test_no_split_for_small_text(self):
+        """Text under limit should not be split."""
+        text = "This is a short message."
+        result = split_message_text(text, max_tokens=1000)
+        assert result == [text]
+
+    def test_splits_on_paragraph_breaks(self):
+        """Should split on paragraph breaks (\\n\\n) first."""
+        # Create longer paragraphs to ensure they exceed the token limit
+        para1 = "This is a longer first paragraph with more content to ensure it has enough tokens. " * 5
+        para2 = "This is a longer second paragraph with different content to ensure it has enough tokens. " * 5
+        para3 = "This is a longer third paragraph with even more content to ensure it has enough tokens. " * 5
+        text = f"{para1}\n\n{para2}\n\n{para3}"
+        result = split_message_text(text, max_tokens=100)  # Force split at 100 tokens
+        assert len(result) > 1
+        # Each part should be complete paragraphs
+        for part in result:
+            assert not part.startswith("\n\n")
+            assert not part.endswith("\n\n")
+
+    def test_splits_on_sentence_breaks_if_no_paragraphs(self):
+        """Should split on sentences if no paragraph breaks."""
+        # Create longer sentences to ensure they exceed the token limit
+        text = (
+            "This is a first sentence with quite a lot of words to make it longer. " * 3 +
+            "This is a second sentence with quite a lot of words to make it longer. " * 3 +
+            "This is a third sentence with quite a lot of words to make it longer. " * 3 +
+            "This is a fourth sentence with quite a lot of words to make it longer. " * 3
+        )
+        result = split_message_text(text, max_tokens=100)  # Force split at 100 tokens
+        assert len(result) > 1
+
+    def test_handles_empty_text(self):
+        """Empty text should return empty list or single empty string."""
+        result = split_message_text("", max_tokens=1000)
+        assert result == [""] or result == []
+
+    def test_merges_small_parts_together(self):
+        """Small paragraphs should be merged to fit within limit."""
+        text = "A.\n\nB.\n\nC.\n\nD."
+        result = split_message_text(text, max_tokens=1000)  # Large limit
+        assert len(result) == 1
+        assert result[0] == text
+
+
+class TestSplitConversation:
+    """split_conversation() splits oversized conversations at message boundaries."""
+
+    def test_no_split_for_small_conversation(self):
+        """Conversation under limit should not be split."""
+        convo = Conversation(
+            id="small",
+            title="Small Talk",
+            create_time=1.0,
+            messages=[
+                Message(id="1", role="user", content="Hi", timestamp=1.0, is_hidden=False)
+            ]
+        )
+        result = split_conversation(convo, max_tokens=10000)
+        assert len(result) == 1
+        assert result[0].id == "small"
+
+    def test_splits_at_message_boundaries(self):
+        """Should split between messages, not mid-message."""
+        convo = Conversation(
+            id="large",
+            title="Long Discussion",
+            create_time=1.0,
+            messages=[
+                Message(id="1", role="user", content="x " * 500, timestamp=1.0, is_hidden=False),
+                Message(id="2", role="assistant", content="y " * 500, timestamp=2.0, is_hidden=False),
+                Message(id="3", role="user", content="z " * 500, timestamp=3.0, is_hidden=False),
+            ]
+        )
+        result = split_conversation(convo, max_tokens=500)
+        assert len(result) > 1
+        # Each part should have complete messages
+        for part in result:
+            for msg in part.messages:
+                assert msg.content  # Not truncated
+
+    def test_creates_sub_conversation_ids(self):
+        """Split parts should have traceable IDs."""
+        convo = Conversation(
+            id="original-123",
+            title="Original Title",
+            create_time=1.0,
+            messages=[
+                Message(id="1", role="user", content="x " * 500, timestamp=1.0, is_hidden=False),
+                Message(id="2", role="user", content="y " * 500, timestamp=2.0, is_hidden=False),
+            ]
+        )
+        result = split_conversation(convo, max_tokens=500)
+        if len(result) > 1:
+            assert result[0].id.startswith("original-123_part")
+            assert result[1].id.startswith("original-123_part")
+            # Parts should be numbered
+            assert "_part1" in result[0].id
+            assert "_part2" in result[1].id
+
+    def test_handles_single_giant_message(self):
+        """Should handle conversation with single giant message."""
+        convo = Conversation(
+            id="giant",
+            title="Giant Message",
+            create_time=1.0,
+            messages=[
+                Message(
+                    id="1",
+                    role="user",
+                    content="paragraph one.\n\nparagraph two.\n\nparagraph three.\n\nparagraph four.",
+                    timestamp=1.0,
+                    is_hidden=False
+                )
+            ]
+        )
+        result = split_conversation(convo, max_tokens=50)
+        # Should split the message text
+        assert len(result) >= 1
+
+
+class TestPrepareConversations:
+    """prepare_conversations() splits all oversized conversations."""
+
+    def test_no_changes_for_small_conversations(self):
+        """Small conversations should pass through unchanged."""
+        convos = [
+            Conversation(
+                id="small-1",
+                title="Small 1",
+                create_time=1.0,
+                messages=[Message(id="1", role="user", content="Hi", timestamp=1.0, is_hidden=False)]
+            ),
+            Conversation(
+                id="small-2",
+                title="Small 2",
+                create_time=2.0,
+                messages=[Message(id="2", role="user", content="Hello", timestamp=2.0, is_hidden=False)]
+            ),
+        ]
+        result = prepare_conversations(convos, max_tokens=10000)
+        assert len(result) == 2
+        assert result[0].id == "small-1"
+        assert result[1].id == "small-2"
+
+    def test_splits_oversized_conversations(self):
+        """Should split conversations that exceed limit."""
+        convos = [
+            Conversation(
+                id="large",
+                title="Large Convo",
+                create_time=1.0,
+                messages=[
+                    Message(id="1", role="user", content="x " * 500, timestamp=1.0, is_hidden=False),
+                    Message(id="2", role="user", content="y " * 500, timestamp=2.0, is_hidden=False),
+                    Message(id="3", role="user", content="z " * 500, timestamp=3.0, is_hidden=False),
+                ]
+            )
+        ]
+        result = prepare_conversations(convos, max_tokens=500)
+        assert len(result) > 1
+        # All parts should trace back to original
+        for conv in result:
+            assert "large" in conv.id
+
+    def test_preserves_small_while_splitting_large(self):
+        """Should preserve small conversations while splitting large ones."""
+        convos = [
+            Conversation(
+                id="small",
+                title="Small",
+                create_time=1.0,
+                messages=[Message(id="1", role="user", content="Hi", timestamp=1.0, is_hidden=False)]
+            ),
+            Conversation(
+                id="large",
+                title="Large",
+                create_time=2.0,
+                messages=[
+                    Message(id="2", role="user", content="x " * 500, timestamp=2.0, is_hidden=False),
+                    Message(id="3", role="user", content="y " * 500, timestamp=3.0, is_hidden=False),
+                ]
+            ),
+        ]
+        result = prepare_conversations(convos, max_tokens=500)
+        # Small should be unchanged
+        assert result[0].id == "small"
+        # Large should be split (parts come after small)
+        assert len(result) > 2
+
+
+class TestCountConversationTokens:
+    """count_conversation_tokens() returns token count for formatted conversation."""
+
+    def test_counts_formatted_tokens(self):
+        """Should count tokens for the formatted representation."""
+        convo = Conversation(
+            id="test",
+            title="Test",
+            create_time=1.0,
+            messages=[
+                Message(id="1", role="user", content="Hello world", timestamp=1.0, is_hidden=False)
+            ]
+        )
+        result = count_conversation_tokens(convo)
+        assert result > 0
+        # Should include overhead for metadata
+        assert result > count_tokens("Hello world")

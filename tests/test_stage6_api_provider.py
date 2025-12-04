@@ -321,56 +321,50 @@ class TestAPIProviderErrorHandling:
                 provider.complete_structured("Test", {"type": "object"})
 
 
-class TestAPIProviderTPMAdaptiveChunking:
-    """TPM-aware adaptive chunk size and parallelism calculations."""
+class TestAPIProviderQualityFirstChunking:
+    """Quality-first chunking: 8k chunks for better extraction, parallelism fills TPM budget."""
 
-    def test_get_safe_chunk_size_tier1(self):
-        """Tier 1 (30k TPM) should use 20k chunks."""
+    def test_get_safe_chunk_size_always_quality_optimal(self):
+        """Should always return 8192 (quality-optimal size) regardless of TPM."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            provider = APIProvider(tpm=30000)
-            # 30k - 10k reserve = 20k
-            assert provider.get_safe_chunk_size() == 20000
-
-    def test_get_safe_chunk_size_high_tpm(self):
-        """High TPM should cap at max chunk size (65536)."""
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            provider = APIProvider(tpm=200000)
-            # 200k - 10k = 190k, but capped at 65536
-            assert provider.get_safe_chunk_size() == 65536
-
-    def test_get_safe_chunk_size_medium_tpm(self):
-        """Medium TPM (80k) should use full 65k chunks."""
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            provider = APIProvider(tpm=80000)
-            # 80k - 10k = 70k, capped at 65536
-            assert provider.get_safe_chunk_size() == 65536
-
-    def test_get_safe_chunk_size_very_low_tpm(self):
-        """Very low TPM should use minimum viable chunk size (4096)."""
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            provider = APIProvider(tpm=10000)
-            # 10k - 10k = 0, but floored at 4096
-            assert provider.get_safe_chunk_size() == 4096
+            # All TPM values should return same quality-optimal chunk size
+            for tpm in [30000, 80000, 200000, 500000]:
+                provider = APIProvider(tpm=tpm)
+                assert provider.get_safe_chunk_size() == 8192
 
     def test_get_max_concurrent_tier1(self):
-        """Tier 1 (30k TPM) should be sequential (1 concurrent)."""
+        """Tier 1 (30k TPM) should allow 2 concurrent (30k / 11k ≈ 2)."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
             provider = APIProvider(tpm=30000)
-            # 30k / (20k + 10k) = 1
-            assert provider.get_max_concurrent() == 1
-
-    def test_get_max_concurrent_high_tpm(self):
-        """High TPM (200k) should allow parallel processing."""
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            provider = APIProvider(tpm=200000)
-            # 200k / (65k + 10k) ≈ 2.6 → 2
+            # 30k / (8k + 3k) = 30k / 11k ≈ 2.7 → 2
             assert provider.get_max_concurrent() == 2
 
+    def test_get_max_concurrent_low_tpm(self):
+        """Very low TPM (10k) should still allow at least 1 concurrent."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=10000)
+            # Even with low TPM, minimum is 1
+            assert provider.get_max_concurrent() >= 1
+
+    def test_get_max_concurrent_medium_tpm(self):
+        """Medium TPM (80k) should allow more parallelism."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=80000)
+            # 80k / 11k ≈ 7.2, but capped at 5
+            assert provider.get_max_concurrent() == 5
+
+    def test_get_max_concurrent_high_tpm(self):
+        """High TPM (200k) should cap at 5 concurrent."""
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider(tpm=200000)
+            # 200k / 11k ≈ 18, but capped at 5
+            assert provider.get_max_concurrent() == 5
+
     def test_get_max_concurrent_very_high_tpm(self):
-        """Very high TPM should cap at 5 concurrent."""
+        """Very high TPM should still cap at 5 concurrent."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
             provider = APIProvider(tpm=500000)
-            # 500k / (65k + 10k) ≈ 6.6, but capped at 5
+            # 500k / 11k ≈ 45, but capped at 5
             assert provider.get_max_concurrent() == 5
 
     def test_adaptive_methods_exist(self):

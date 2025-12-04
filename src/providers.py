@@ -38,6 +38,10 @@ MIN_CHUNK_SIZE = 4096   # Minimum viable chunk size
 MAX_CHUNK_SIZE = 65536  # Default/maximum chunk size (2^16)
 MAX_CONCURRENT = 5      # Maximum parallel requests
 
+# Quality-first chunking constants (Phase 2)
+QUALITY_CHUNK_SIZE = 8192  # Optimal for extraction quality (2^13)
+OUTPUT_ESTIMATE = 3000     # Conservative output estimate for parallelism calc
+
 # Retry constants for rate limit handling
 MAX_RETRIES = 3         # Number of retry attempts on rate limit
 INITIAL_BACKOFF = 5     # Initial backoff in seconds (5s, 10s, 20s)
@@ -371,31 +375,28 @@ class APIProvider(LLMProvider):
 
     def get_safe_chunk_size(self) -> int:
         """
-        Calculate chunk size that fits within TPM limit.
+        Return quality-optimal chunk size for extraction.
 
-        Formula: safe = tpm - output_reserve, clamped to [MIN, MAX]
+        Philosophy: Smaller chunks = better LLM recall (avoid "lost in middle")
+        Fixed at 8k regardless of TPM - parallelism handles throughput.
 
-        Examples:
-            TPM 30k → 20k chunks (Tier 1)
-            TPM 80k → 65k chunks (capped at max)
+        Returns:
+            8192 tokens (quality-optimal size)
         """
-        safe = self.tpm - OUTPUT_RESERVE
-        safe = max(MIN_CHUNK_SIZE, safe)
-        safe = min(MAX_CHUNK_SIZE, safe)
-        return safe
+        return QUALITY_CHUNK_SIZE
 
     def get_max_concurrent(self) -> int:
         """
-        Calculate optimal parallelism for this TPM limit.
+        Calculate parallelism that fits within TPM budget.
 
-        Formula: concurrent = tpm / (chunk_size + output_reserve), capped at MAX_CONCURRENT
+        Formula: concurrent = tpm / (chunk_size + output_estimate)
+        Uses OUTPUT_ESTIMATE (3k) not OUTPUT_RESERVE (10k) for realistic calc.
 
         Examples:
-            TPM 30k → 1 (sequential)
-            TPM 200k → 2 parallel
-            TPM 400k → 5 parallel (capped)
+            TPM 30k → 30000 / 11000 = 2 concurrent
+            TPM 80k → 80000 / 11000 = 5 concurrent (capped)
         """
         chunk_size = self.get_safe_chunk_size()
-        tokens_per_request = chunk_size + OUTPUT_RESERVE
+        tokens_per_request = chunk_size + OUTPUT_ESTIMATE  # ~11k per request
         concurrent = max(1, self.tpm // tokens_per_request)
         return min(concurrent, MAX_CONCURRENT)
