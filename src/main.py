@@ -45,7 +45,7 @@ from src.extractor import extract_chunk
 
 
 # Supported export types
-SUPPORTED_EXPORTS = {"chatgpt"}
+SUPPORTED_EXPORTS = {"chatgpt", "claude"}
 
 
 def is_supported_export(export_type: ExportType) -> bool:
@@ -63,18 +63,12 @@ def get_coming_soon_message(export_type: ExportType) -> str:
     Returns:
         User-friendly message explaining support status
     """
-    if export_type == "claude":
-        return (
-            "Claude exports are coming soon!\n"
-            "Currently supported: ChatGPT\n"
-            "Claude support is on the roadmap."
-        )
-    else:
-        return (
-            "Export format not recognized.\n"
-            "Currently supported: ChatGPT\n"
-            "More formats coming soon!"
-        )
+    # Both ChatGPT and Claude are now supported
+    return (
+        "Export format not recognized.\n"
+        "Currently supported: ChatGPT, Claude\n"
+        "More formats coming soon!"
+    )
 
 # Constants
 DEFAULT_INPUT_PATH = "conversations.json"
@@ -117,7 +111,7 @@ def get_banner() -> str:
     LLM IMPORTER
     Extract your AI memories
 
-    Import your ChatGPT history into any AI assistant.
+    Import your ChatGPT or Claude history into any AI assistant.
     """
 
 
