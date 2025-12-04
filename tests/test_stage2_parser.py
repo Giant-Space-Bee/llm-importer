@@ -473,3 +473,155 @@ class TestParseAllUnified:
 
         with pytest.raises(ValueError, match="Unknown export type"):
             parse_all(str(unknown_file))
+
+
+# --- Claude memories.json tests ---
+
+from src.parser import (
+    load_claude_memories,
+    format_memories_for_distiller,
+    ClaudeMemories,
+)
+
+
+@pytest.fixture
+def claude_memories_fixture():
+    """Path to the Claude memories test fixture."""
+    return Path(__file__).parent / "fixtures" / "claude_memories.json"
+
+
+@pytest.fixture
+def claude_export_folder(tmp_path, claude_fixture, claude_memories_fixture):
+    """Create a mock Claude export folder with conversations and memories."""
+    # Copy fixtures to temp folder
+    import shutil
+    folder = tmp_path / "data-2025-12-03-test"
+    folder.mkdir()
+    shutil.copy(claude_fixture, folder / "conversations.json")
+    shutil.copy(claude_memories_fixture, folder / "memories.json")
+    return folder
+
+
+class TestLoadClaudeMemories:
+    """Tests for load_claude_memories() function."""
+
+    def test_loads_valid_memories(self, claude_export_folder):
+        """Should load and parse valid memories.json."""
+        memories = load_claude_memories(str(claude_export_folder))
+
+        assert memories is not None
+        assert isinstance(memories, ClaudeMemories)
+        assert "Test User" in memories.conversations_memory
+        assert "software developer" in memories.conversations_memory
+        assert len(memories.project_memories) == 2
+        assert memories.account_uuid == "test-account-uuid-12345"
+
+    def test_parses_project_memories(self, claude_export_folder):
+        """Should parse project memories with all fields."""
+        memories = load_claude_memories(str(claude_export_folder))
+
+        assert memories is not None
+        # Check first project
+        project1 = memories.project_memories.get("test-project-uuid-001")
+        assert project1 is not None
+        assert "document processing" in project1
+        assert "Purpose & context" in project1
+
+    def test_returns_none_for_missing_file(self, tmp_path):
+        """Should return None if memories.json doesn't exist."""
+        empty_folder = tmp_path / "empty"
+        empty_folder.mkdir()
+
+        result = load_claude_memories(str(empty_folder))
+        assert result is None
+
+    def test_returns_none_for_malformed_json(self, tmp_path):
+        """Should return None for invalid JSON."""
+        folder = tmp_path / "bad"
+        folder.mkdir()
+        (folder / "memories.json").write_text("not valid json")
+
+        result = load_claude_memories(str(folder))
+        assert result is None
+
+    def test_returns_none_for_empty_array(self, tmp_path):
+        """Should return None for empty array."""
+        folder = tmp_path / "empty_array"
+        folder.mkdir()
+        (folder / "memories.json").write_text("[]")
+
+        result = load_claude_memories(str(folder))
+        assert result is None
+
+    def test_returns_none_for_empty_content(self, tmp_path):
+        """Should return None if both memory fields are empty."""
+        folder = tmp_path / "empty_content"
+        folder.mkdir()
+        (folder / "memories.json").write_text(
+            '[{"conversations_memory": "", "project_memories": {}, "account_uuid": "test"}]'
+        )
+
+        result = load_claude_memories(str(folder))
+        assert result is None
+
+    def test_handles_conversations_only(self, tmp_path):
+        """Should work with only conversations_memory (no project memories)."""
+        folder = tmp_path / "convos_only"
+        folder.mkdir()
+        (folder / "memories.json").write_text(
+            '[{"conversations_memory": "Some memories here", "project_memories": {}, "account_uuid": "test"}]'
+        )
+
+        result = load_claude_memories(str(folder))
+        assert result is not None
+        assert result.conversations_memory == "Some memories here"
+        assert len(result.project_memories) == 0
+
+
+class TestFormatMemoriesForDistiller:
+    """Tests for format_memories_for_distiller() function."""
+
+    def test_formats_full_memories(self, claude_export_folder):
+        """Should format both conversations and project memories."""
+        memories = load_claude_memories(str(claude_export_folder))
+        assert memories is not None
+
+        formatted = format_memories_for_distiller(memories)
+
+        # Should contain conversations memory
+        assert "Test User" in formatted
+        assert "software developer" in formatted
+
+        # Should contain project memories section
+        assert "Project-Specific Context" in formatted
+        assert "document processing" in formatted
+
+    def test_formats_conversations_only(self):
+        """Should work with only conversations memory."""
+        memories = ClaudeMemories(
+            conversations_memory="User is a developer.",
+            project_memories={},
+            account_uuid="test"
+        )
+
+        formatted = format_memories_for_distiller(memories)
+
+        assert "User is a developer" in formatted
+        assert "Project-Specific Context" not in formatted
+
+    def test_formats_with_multiple_projects(self):
+        """Should include all project memories."""
+        memories = ClaudeMemories(
+            conversations_memory="Main memory",
+            project_memories={
+                "proj-1": "Project 1 content",
+                "proj-2": "Project 2 content",
+            },
+            account_uuid="test"
+        )
+
+        formatted = format_memories_for_distiller(memories)
+
+        assert "Main memory" in formatted
+        assert "Project 1 content" in formatted
+        assert "Project 2 content" in formatted

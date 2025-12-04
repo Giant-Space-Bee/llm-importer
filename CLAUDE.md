@@ -83,6 +83,26 @@ otherwise → unknown
 
 ## Key Patterns
 
+**Trusted baseline (Claude memories, ChatGPT custom instructions):**
+- Claude exports include `memories.json` with pre-synthesized user profile
+- ChatGPT exports have `user_editable_context` (custom instructions)
+- These are "free wins" — already curated, don't decompose/recompose
+- Pass to distiller as `trusted_context`, merge with extracted facts
+- Distiller preserves trusted content, adds only genuinely NEW information
+- No artificial priority/frequency hacks — let LLM naturally prefer "trusted" context
+
+```
+                                    ┌─────────────────┐
+                                    │ memories.json   │
+                                    │ (trusted prose) │
+                                    └────────┬────────┘
+                                             │
+conversations.json → Extract → Verify → Aggregate → Dedup ──┬──→ Distill → Output
+                                                            │
+                                                    "Merge these facts with
+                                                     this trusted profile"
+```
+
 **Chunk-based processing (not BatchedLLMTask):**
 - Chunker splits convos into 65536-token batches upfront
 - Sequential for local (one at a time, one LLM process)
@@ -220,7 +240,7 @@ response = client.beta.messages.create(
 
 ## Project Stats
 - **Source data:** 450 convos, 17M chars (~4.3M tokens), 6,208 user messages, 367 user_editable_context blocks
-- **Test coverage:** 176 tests, 0 skipped (Stage 1-7 complete; Stage 8-9 stubs)
+- **Test coverage:** 186 tests, 0 skipped (Stage 1-7 complete; Stage 8-9 stubs)
 - **Modules:** 11 src files (providers, parser, chunker, extractor, verifier, aggregator, checkpoint, processor, deduplicator, distiller, main)
 
 ## Stage 5 Verifier Findings (2025-12-03)
@@ -251,9 +271,15 @@ response = client.beta.messages.create(
 
 ---
 
-## Project Ideas
+## Future Work
 
-**Warn-and-pause instead of timeout:**
-For local LLM calls, never use hard timeouts. A 12-min inference shouldn't die to a 10-min timeout.
-Instead: after N seconds of silence, print warning ("this is taking a while..."), pause between batches, user approves continuation.
-Generalizable to any long-running local LLM work.
+**ChatGPT user_editable_context as trusted baseline:**
+- Currently parsed as `UserProfile` but not passed to distiller
+- Same pattern as Claude memories: pass to distiller as `trusted_context`
+- Lower priority than Claude memories (less rich — just custom instructions, not synthesized profile)
+
+**Refactor parser.py (484 lines):**
+- Split into modules: `parsers/chatgpt.py`, `parsers/claude.py`, `parsers/memories.py`
+- Keep `parser.py` as facade with `parse_all()`, `detect_export_type()`
+- Makes adding Gemini/other formats cleaner
+- Consider abstract base or protocol for format parsers

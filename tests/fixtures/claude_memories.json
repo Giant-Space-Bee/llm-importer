@@ -1,0 +1,18 @@
+[{
+  "conversations_memory": "**Work context**\n\nTest User is a software developer specializing in Python and AI systems. They work at Test Company as a Senior Engineer, focusing on machine learning pipelines and data processing. They have 5 years of experience in the field.\n\n**Personal context**\n\nTest User lives in Vancouver, BC with their partner and a golden retriever named Max. They enjoy hiking on weekends and are learning to play guitar. They prefer dark mode in all applications and use vim keybindings.\n\n**Top of mind**\n\nCurrently focused on building an AI-powered document processing system. Also exploring home automation with smart devices. Planning a trip to Japan next spring.",
+  "project_memories": {
+    "test-project-uuid-001": {
+      "uuid": "test-project-uuid-001",
+      "Purpose & context": "Building a document processing pipeline that uses LLMs to extract structured data from PDFs. The system needs to handle high volume (1000+ docs/day) with 99% accuracy.",
+      "Current state": "MVP complete with basic extraction working. Currently optimizing for speed and adding support for multi-page documents.",
+      "Key learnings & principles": "Chunking documents before LLM processing is essential. Smaller focused prompts work better than large complex ones. Always verify LLM output against source."
+    },
+    "test-project-uuid-002": {
+      "uuid": "test-project-uuid-002",
+      "Purpose & context": "Home automation project using Home Assistant and custom Python scripts. Goal is to automate lighting, heating, and security based on presence detection.",
+      "Current state": "Basic setup complete. Motion sensors and smart lights working. Need to integrate with heating system.",
+      "Approach & patterns": "Prefer local processing over cloud dependencies. Use MQTT for device communication. Keep automations simple and debuggable."
+    }
+  },
+  "account_uuid": "test-account-uuid-12345"
+}]

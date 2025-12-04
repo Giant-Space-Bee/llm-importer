@@ -3,9 +3,15 @@ distiller.py - Final compression to memory profile
 
 Uses LLM to compress deduplicated facts into coherent profile.
 Outputs both memory-profile.md and memory-profile.json.
+
+Supports "trusted baseline" pattern:
+- Claude exports include memories.json (pre-synthesized profile)
+- ChatGPT exports may have user_editable_context (custom instructions)
+- These are passed as trusted_context, which the distiller merges
+  with extracted facts rather than starting from scratch.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pathlib import Path
 
 # from .core import BatchedLLMTask
@@ -14,23 +20,38 @@ from pathlib import Path
 def distill(
     facts: List,  # Deduplicated ExtractedFacts
     provider,  # LLMProvider
-    output_dir: Path
+    output_dir: Path,
+    trusted_context: Optional[str] = None  # Pre-existing trusted profile (Claude memories, etc.)
 ) -> tuple[Path, Path]:
     """
     Compress facts into final memory profile.
 
-    Uses BatchedLLMTask for auto-batching.
+    If trusted_context is provided (e.g., from Claude memories.json),
+    the distiller merges extracted facts with the existing profile
+    rather than creating from scratch. This preserves user-curated
+    content while supplementing with newly extracted details.
+
+    Args:
+        facts: Deduplicated ExtractedFacts from aggregator
+        provider: LLMProvider for LLM calls
+        output_dir: Where to write output files
+        trusted_context: Optional pre-existing profile prose to merge with
 
     Returns:
         (path_to_md, path_to_json)
     """
-    # TODO:
+    # TODO (Stage 9):
     # 1. Load distill prompt template
-    # 2. Use BatchedLLMTask to process
-    # 3. Parse response into structured profile
-    # 4. Write memory-profile.md
-    # 5. Write memory-profile.json
-    # 6. Return paths
+    # 2. If trusted_context provided:
+    #    - Use merge prompt: "Here's a trusted profile. Add only NEW info from facts."
+    #    - Prefer trusted_context phrasing where overlapping
+    # 3. Else:
+    #    - Use standard prompt: "Create profile from these facts."
+    # 4. Use BatchedLLMTask to process
+    # 5. Parse response into structured profile
+    # 6. Write memory-profile.md
+    # 7. Write memory-profile.json
+    # 8. Return paths
     pass
 
 

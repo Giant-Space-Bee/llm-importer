@@ -29,7 +29,10 @@ from src.parser import (
     get_stats_from_parsed,
     detect_export_type,
     load_conversations,
+    load_claude_memories,
+    format_memories_for_distiller,
     ExportType,
+    ClaudeMemories,
 )
 from src.chunker import chunk_conversations, Chunk, DEFAULT_CHUNK_SIZE
 from src.providers import LocalProvider, APIProvider, LLMProvider
@@ -47,6 +50,36 @@ from src.checkpoint import (
 
 # Supported export types
 SUPPORTED_EXPORTS = {"chatgpt", "claude"}
+
+
+def find_memories_json(input_path: str) -> Optional[Path]:
+    """
+    Find memories.json for a Claude export.
+
+    Claude exports are folders containing multiple JSON files.
+    This function handles both:
+    - Direct folder path: /path/to/data-timestamp-batch-N/
+    - File path: /path/to/data-timestamp-batch-N/conversations.json
+
+    Args:
+        input_path: Path to Claude export (folder or conversations.json)
+
+    Returns:
+        Path to memories.json if found, None otherwise
+    """
+    path = Path(input_path)
+
+    # If it's a file, check parent folder
+    if path.is_file():
+        folder = path.parent
+    else:
+        folder = path
+
+    memories_path = folder / "memories.json"
+    if memories_path.exists():
+        return memories_path
+
+    return None
 
 
 def is_supported_export(export_type: ExportType) -> bool:
@@ -449,6 +482,9 @@ def main():
     raw_convos = load_conversations(input_file)
     conversations_by_id = {c["id"]: c for c in raw_convos}
 
+    # Detect export type for Claude memories
+    export_type = detect_export_type(raw_convos)
+
     # Show stats table
     table = Table(title="Conversation Stats", show_header=False)
     table.add_column("Metric", style="cyan")
@@ -467,6 +503,25 @@ def main():
             title="User Profile Preview",
             border_style="green"
         ))
+
+    # Load Claude memories if available (trusted baseline)
+    claude_memories: Optional[ClaudeMemories] = None
+    trusted_context: Optional[str] = None
+    if export_type == "claude":
+        memories_path = find_memories_json(input_file)
+        if memories_path:
+            claude_memories = load_claude_memories(str(memories_path.parent))
+            if claude_memories:
+                trusted_context = format_memories_for_distiller(claude_memories)
+                mem_preview = claude_memories.conversations_memory[:300]
+                if len(claude_memories.conversations_memory) > 300:
+                    mem_preview += "..."
+                console.print("\n[bold green]Found Claude memories (trusted baseline)![/bold green]")
+                console.print(Panel(
+                    mem_preview,
+                    title=f"Claude Memories ({len(claude_memories.project_memories)} projects)",
+                    border_style="green"
+                ))
 
     # Chunk conversations
     chunk_size = DEMO_CHUNK_SIZE if args.demo else DEFAULT_CHUNK_SIZE
