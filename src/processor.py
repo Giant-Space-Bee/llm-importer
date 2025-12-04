@@ -141,7 +141,7 @@ async def process_chunks_parallel(
         *[process_with_semaphore(chunk) for chunk in chunks]
     )
 
-    executor.shutdown(wait=False)
+    executor.shutdown(wait=True)
 
     # Flatten results
     all_facts = []
