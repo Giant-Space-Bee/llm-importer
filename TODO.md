@@ -36,8 +36,12 @@
   - [x] Tests for both export types (13 tests added)
   - [x] Verifier handles both raw conversation formats
 
+- [x] Stage 7: Aggregator (17 tests)
+  - 7a: `aggregate()` - group facts by normalized text, count frequency, keep newest
+  - 7b: `group_by_category()` - organize for deduplication
+  - Reuses `normalize_text()` from verifier for case/unicode normalization
+
 ## Pending
-- [ ] Stage 7: Aggregator (combine + count)
 - [ ] Stage 8: Deduplicator (LLM semantic dedup)
 - [ ] Stage 9: Distiller (final output)
 
@@ -72,4 +76,4 @@ pre-commit run --all-files
 ```
 
 ## Test Count
-147 tests passing
+164 tests passing
