@@ -23,6 +23,12 @@ from typing import Optional
 import anthropic
 import httpx
 
+# Provider configuration constants
+DEFAULT_TEMPERATURE = 0.3  # Lower = more deterministic for extraction
+DEFAULT_MAX_TOKENS = 8192  # Plenty of room for extracted facts
+SECONDS_PER_MINUTE = 60
+RATE_LIMIT_BUFFER = 0.1  # Buffer in seconds for rate limit waits
+
 
 class LLMProvider(ABC):
     """Abstract base for LLM providers."""
@@ -77,8 +83,8 @@ class LocalProvider(LLMProvider):
             "messages": [
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.3,  # Lower = more deterministic for extraction
-            "max_tokens": 8192,  # Plenty of room for extracted facts
+            "temperature": DEFAULT_TEMPERATURE,
+            "max_tokens": DEFAULT_MAX_TOKENS,
         }
 
         try:
@@ -116,8 +122,8 @@ class LocalProvider(LLMProvider):
             "messages": [
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.3,
-            "max_tokens": 8192,
+            "temperature": DEFAULT_TEMPERATURE,
+            "max_tokens": DEFAULT_MAX_TOKENS,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
@@ -203,7 +209,7 @@ class APIProvider(LLMProvider):
     def _maybe_reset_minute(self) -> None:
         """Reset counters if minute has rolled over."""
         now = time.time()
-        if now - self._minute_start >= 60:
+        if now - self._minute_start >= SECONDS_PER_MINUTE:
             self._requests_this_minute = 0
             self._tokens_this_minute = 0
             self._minute_start = now
