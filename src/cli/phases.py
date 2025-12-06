@@ -21,7 +21,7 @@ from src.parser import (
 from src.chunker import chunk_conversations, Chunk, DEFAULT_CHUNK_SIZE, prepare_conversations
 from src.providers import LLMProvider, APIProvider
 from src.extractor import ExtractedFact
-from src.processor import extract_and_verify_chunk, process_all_chunks
+from src.processor import extract_and_verify_chunk, process_all_chunks, ParallelResult
 from src.aggregator import aggregate, AggregatedFact, group_by_category
 from src.deduplicator import deduplicate, DeduplicatedFact
 from src.checkpoint import hash_file, save_checkpoint, get_remaining_chunks, load_checkpoint
@@ -333,32 +333,61 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
         # Local LLM: sequential with per-chunk checkpointing
         verified_facts = process_sequential_with_checkpoints(ctx)
     else:
-        # API: parallel processing, checkpoint at end
+        # API: parallel processing with per-chunk checkpointing
         start_time = time.time()
-        console.print("[dim]Processing in parallel...[/dim]")
+        checkpoint_path = get_checkpoint_path(ctx.input_file)
+        file_hash = hash_file(ctx.input_file)
 
-        new_facts = process_all_chunks(
-            ctx.chunks, provider, ctx.raw_conversations_by_id
+        # Get only the chunks we need to process
+        chunks_to_process = [ctx.chunks[i] for i in ctx.remaining_indices]
+
+        console.print(
+            f"[dim]Processing {len(chunks_to_process)} chunks in parallel...[/dim]"
+        )
+
+        # Checkpoint callback - saves after each chunk completes
+        def on_chunk_complete(completed_indices, all_facts):
+            save_checkpoint(checkpoint_path, {
+                "source_file_hash": file_hash,
+                "completed_chunks": sorted(completed_indices),
+                "verified_facts": [
+                    asdict(f) if isinstance(f, ExtractedFact) else f
+                    for f in all_facts
+                ]
+            })
+
+        # Process with checkpointing
+        result: ParallelResult = process_all_chunks(
+            chunks_to_process,
+            provider,
+            ctx.raw_conversations_by_id,
+            chunk_indices=ctx.remaining_indices,
+            on_chunk_complete=on_chunk_complete,
+            existing_facts=list(ctx.existing_facts)
         )
 
         elapsed = time.time() - start_time
-        console.print(
-            f"  [green]Extracted {len(new_facts)} verified facts[/green] "
-            f"[{format_elapsed_time(elapsed)}]"
-        )
 
-        verified_facts = list(ctx.existing_facts) + new_facts
+        # Report results
+        if result.failed_indices:
+            console.print(
+                f"  [yellow]Warning: {len(result.failed_indices)} chunks failed, "
+                f"{len(result.completed_indices)} succeeded[/yellow]"
+            )
+            for idx in result.failed_indices:
+                error = result.errors.get(idx, "Unknown error")
+                console.print(f"    [red]Chunk {idx + 1}: {error}[/red]")
+            console.print(
+                "[dim]Successful chunks have been checkpointed. "
+                "Re-run with --resume to retry failed chunks.[/dim]"
+            )
+        else:
+            console.print(
+                f"  [green]Extracted {len(result.facts) - len(ctx.existing_facts)} "
+                f"new verified facts[/green] [{format_elapsed_time(elapsed)}]"
+            )
 
-        # Save final checkpoint
-        checkpoint_path = get_checkpoint_path(ctx.input_file)
-        save_checkpoint(checkpoint_path, {
-            "source_file_hash": hash_file(ctx.input_file),
-            "completed_chunks": list(range(len(ctx.chunks))),
-            "verified_facts": [
-                asdict(f) if isinstance(f, ExtractedFact) else f
-                for f in verified_facts
-            ]
-        })
+        verified_facts = result.facts
 
     ctx.verified_facts = verified_facts
     return ctx

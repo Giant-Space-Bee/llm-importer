@@ -142,17 +142,102 @@ class TestProcessChunksParallel:
 
         fake_fact = {"fact": "test", "category": "personal"}
 
+        async def mock_extract(chunk, *args, **kwargs):
+            # Return facts based on chunk id
+            return [fake_fact] * (chunk.id + 1)  # 1, 2, 3 facts
+
+        with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
+            result = await process_chunks_parallel(chunks, provider)
+
+        assert len(result.facts) == 6  # 1 + 2 + 3
+
+
+class TestProcessChunksParallelFailure:
+    """Tests for partial failure handling in parallel processing."""
+
+    @pytest.mark.asyncio
+    async def test_continues_after_chunk_failure(self):
+        """Should continue processing other chunks even if one fails."""
+        provider = MockProvider(is_local=False)
+        chunks = [make_test_chunk(i) for i in range(5)]
+
         call_count = 0
 
         async def mock_extract(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            return [fake_fact] * call_count  # 1, 2, 3 facts
+            if call_count == 3:  # Third chunk fails
+                raise ValueError("Simulated API error")
+            return [{"fact": f"fact-{call_count}", "category": "personal"}]
 
         with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
             result = await process_chunks_parallel(chunks, provider)
 
-        assert len(result) == 6  # 1 + 2 + 3
+        # All 5 chunks should have been attempted
+        assert call_count == 5
+        # 4 successful chunks should have results
+        assert len(result.completed_indices) == 4
+        assert len(result.facts) == 4
+        # 1 chunk should be in failed_indices
+        assert len(result.failed_indices) == 1
+        assert 2 in result.failed_indices  # 0-indexed, 3rd chunk
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_callback_called_per_chunk(self):
+        """Should call checkpoint callback after each successful chunk."""
+        provider = MockProvider(is_local=False)
+        chunks = [make_test_chunk(i) for i in range(3)]
+
+        checkpoint_calls = []
+
+        def on_checkpoint(completed_indices, facts):
+            checkpoint_calls.append((completed_indices.copy(), len(facts)))
+
+        async def mock_extract(*args, **kwargs):
+            return [{"fact": "test", "category": "personal"}]
+
+        with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
+            result = await process_chunks_parallel(
+                chunks, provider,
+                on_chunk_complete=on_checkpoint
+            )
+
+        # Should have been called 3 times (once per chunk)
+        assert len(checkpoint_calls) == 3
+        # Final call should have all 3 chunks and 3 facts
+        final_indices, final_count = checkpoint_calls[-1]
+        assert len(final_indices) == 3
+        assert final_count == 3
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_saved_even_on_partial_failure(self):
+        """Checkpoint should contain results from successful chunks even if some fail."""
+        provider = MockProvider(is_local=False)
+        chunks = [make_test_chunk(i) for i in range(5)]
+
+        checkpoint_calls = []
+
+        def on_checkpoint(completed_indices, facts):
+            checkpoint_calls.append((completed_indices.copy(), list(facts)))
+
+        async def mock_extract(chunk, *args, **kwargs):
+            # Use chunk id to determine failure (chunk 2 fails)
+            if chunk.id == 2:
+                raise ValueError("Simulated error")
+            return [{"fact": f"fact-{chunk.id}", "category": "personal"}]
+
+        with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
+            result = await process_chunks_parallel(
+                chunks, provider,
+                on_chunk_complete=on_checkpoint
+            )
+
+        # Should have 4 successful checkpoint calls (chunk 2 failed)
+        assert len(checkpoint_calls) == 4
+        # Result should have 4 facts from successful chunks
+        assert len(result.facts) == 4
+        assert len(result.failed_indices) == 1
+        assert 2 in result.failed_indices
 
 
 class TestProcessAllChunks:
@@ -175,13 +260,20 @@ class TestProcessAllChunks:
         chunks = [make_test_chunk(0)]
 
         with patch('src.processor.process_chunks_parallel', new_callable=AsyncMock) as mock_par:
-            mock_par.return_value = []
+            from src.processor import ParallelResult
+            mock_par.return_value = ParallelResult(
+                facts=[],
+                completed_indices=set(),
+                failed_indices=[],
+                errors={}
+            )
             process_all_chunks(chunks, provider)
 
         mock_par.assert_called_once()
 
-    def test_returns_facts_list(self):
-        """Should return list of verified facts."""
+    def test_returns_parallel_result(self):
+        """Should return ParallelResult with facts."""
+        from src.processor import ParallelResult
         provider = MockProvider(is_local=True)
         chunks = [make_test_chunk(0)]
 
@@ -191,5 +283,5 @@ class TestProcessAllChunks:
             mock_extract.return_value = [fake_fact]
             result = process_all_chunks(chunks, provider)
 
-        assert isinstance(result, list)
-        assert len(result) == 1
+        assert isinstance(result, ParallelResult)
+        assert len(result.facts) == 1
