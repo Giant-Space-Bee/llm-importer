@@ -33,6 +33,7 @@ from src.cli.display import (
     show_claude_memories_preview,
     show_chunk_table,
     show_results,
+    show_dedup_results,
 )
 
 # Validation
@@ -69,6 +70,7 @@ from src.cli.phases import (
     phase_check_resume,
     phase_extract,
     phase_aggregate,
+    phase_deduplicate,
     process_sequential_with_checkpoints,
 )
 
@@ -87,6 +89,7 @@ __all__ = [
     "show_claude_memories_preview",
     "show_chunk_table",
     "show_results",
+    "show_dedup_results",
     # Validation
     "DEFAULT_INPUT_PATH",
     "SUPPORTED_EXPORTS",
@@ -111,5 +114,6 @@ __all__ = [
     "phase_check_resume",
     "phase_extract",
     "phase_aggregate",
+    "phase_deduplicate",
     "process_sequential_with_checkpoints",
 ]

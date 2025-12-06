@@ -32,6 +32,7 @@ from src.cli import (
     format_elapsed_time,
     get_coming_soon_message,
     show_results,
+    show_dedup_results,
     # Validation
     DEFAULT_INPUT_PATH,
     SUPPORTED_EXPORTS,
@@ -55,6 +56,7 @@ from src.cli import (
     phase_check_resume,
     phase_extract,
     phase_aggregate,
+    phase_deduplicate,
     process_sequential_with_checkpoints,
 )
 
@@ -150,18 +152,19 @@ def main() -> int:
         ctx = phase_check_resume(ctx)
         ctx = phase_extract(ctx)
         ctx = phase_aggregate(ctx)
+        ctx = phase_deduplicate(ctx)
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted. Progress saved to checkpoint.[/yellow]")
         return 1
     except Exception as e:
-        console.print(f"\n[red]Error during extraction:[/red] {e}")
+        console.print(f"\n[red]Error during processing:[/red] {e}")
         if ctx.provider and ctx.provider.is_local:
             console.print("[dim]Make sure LM Studio is running at http://127.0.0.1:1234[/dim]")
         return 1
 
     # Show results
-    if ctx.aggregated_facts:
-        show_results(console, ctx.aggregated_facts)
+    if ctx.deduplicated_facts:
+        show_dedup_results(console, ctx.deduplicated_facts, len(ctx.aggregated_facts))
 
     console.print("\n[green]Done![/green]")
     return 0
