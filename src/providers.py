@@ -361,7 +361,28 @@ class APIProvider(LLMProvider):
                 response.usage.input_tokens,
                 response.usage.output_tokens
             )
-            content = response.content[0].text
+
+            # Validate response content
+            if not response.content:
+                raise RuntimeError("Claude API returned empty content array")
+
+            content_block = response.content[0]
+
+            # Check content block type (could be ToolUseBlock, etc.)
+            if not hasattr(content_block, "text"):
+                raise RuntimeError(
+                    f"Unexpected content block type: {type(content_block).__name__}"
+                )
+
+            content = content_block.text
+
+            # Debug logging for malformed responses
+            if not content or not content.strip().startswith("{"):
+                print(
+                    f"[DEBUG] Unexpected API response: {content[:200]!r}",
+                    file=sys.stderr,
+                )
+
             return json.loads(content)
 
         try:
