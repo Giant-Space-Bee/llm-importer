@@ -66,8 +66,41 @@ python -m src.main ~/Downloads/data-2025-12-03-batch-0000/conversations.json --p
 3. **Extract** - LLM extracts facts with source quotes
 4. **Verify** - String-matches quotes against originals (catches hallucinations)
 5. **Aggregate** - Combines verified facts, counts frequency
+6. **Deduplicate** - LLM merges semantic duplicates (newer > specific > frequent)
+7. **Distill** - LLM compresses into coherent categorized profile
+8. **Output** - Writes `memory-profile.md` + `memory-profile.json`
 
-Progress is checkpointed after each chunk. If interrupted, use `--resume` to continue.
+Progress is checkpointed after each stage. If interrupted, use `--resume` to continue.
+
+## Output
+
+After a successful run, find your results in the `output/` directory:
+
+```
+output/
+├── memory-profile.md    # Human-readable categorized profile
+└── memory-profile.json  # Machine-importable format
+```
+
+**Categories:** personal, professional, family, preferences, interests, personality
+
+### Example Output
+
+```markdown
+# Memory Profile for Landon
+
+> Generated: 2025-12-05T22:30:00
+> Source: ChatGPT export (450 conversations)
+
+## Personal
+- Lives in Victoria, BC
+- Originally from the United States
+
+## Professional
+- Freelance AI architect at Coding Fox Corp
+- Works primarily with Python and TypeScript
+...
+```
 
 ## Prerequisites
 
@@ -115,10 +148,6 @@ python -m src.main ... --resume
 python -m src.main ...
 ```
 
-## Output
-
-Currently outputs aggregated facts to console. Final stages (dedup + distill to `memory-profile.md`) in development.
-
 ## Development
 
 ```bash
@@ -134,7 +163,10 @@ src/
 ├── extractor.py     # LLM fact extraction
 ├── verifier.py      # Quote verification
 ├── aggregator.py    # Fact aggregation
-└── providers.py     # LLM provider abstraction
+├── deduplicator.py  # Semantic deduplication
+├── distiller.py     # Profile compression
+├── providers.py     # LLM provider abstraction
+└── checkpoint.py    # Resume support
 ```
 
 ## License

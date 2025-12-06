@@ -10,20 +10,23 @@ No vector DBs, no Mem0, no KV stores. Just LLMs + string matching.
 ## Quick CLI Commands
 
 ```bash
-# Demo mode (first chunk, 4k tokens) - use for testing
-python -m src.main path/to/conversations.json --demo --provider local
+# REQUIRED: Set API key first
+export ANTHROPIC_API_KEY=sk-ant-...
 
-# Full run with local LLM
-python -m src.main path/to/conversations.json --provider local
-
-# Full run with API (parallel processing)
+# Basic usage (API mode, recommended)
 python -m src.main path/to/conversations.json --provider api
 
-# Resume interrupted run
-python -m src.main path/to/conversations.json --resume --provider local
+# Demo mode - quick test with first chunk only
+python -m src.main path/to/conversations.json --demo --provider api
 
-# Show all options
-python -m src.main --help
+# Resume an interrupted run
+python -m src.main path/to/conversations.json --resume --provider api
+
+# Local LLM mode (requires LM Studio at localhost:1234)
+python -m src.main path/to/conversations.json --provider local
+
+# Custom rate limit (tokens per minute)
+python -m src.main path/to/conversations.json --provider api --tpm 40000
 ```
 
 ## Pipeline
@@ -41,6 +44,7 @@ conversations.json → Parse → Chunk(65536) → Extract(LLM) → Verify → Ag
 | 5 Aggregate | No | Concat verified facts, count frequency |
 | 6 Dedup | Yes | Semantic dedup; prefer newer > specific > frequent |
 | 7 Distill | Yes | Compress to final categorized profile |
+| 8 Output | No | Write `memory-profile.md` + `.json` to `output/` |
 
 ## Export Formats
 
@@ -94,9 +98,12 @@ otherwise → unknown
 Categories: personal, professional, family, preferences, interests, personality
 
 ## Output
-- `memory-profile.md` — human readable, categorized
-- `memory-profile.json` — `{ categories: { personal: [...], ... } }` for importing
+
+After successful run, files are written to `output/`:
+- `memory-profile.md` — human readable, categorized profile
+- `memory-profile.json` — `{ name, generated, source, categories: {...} }` for importing
+
+Progress checkpointed after each stage. Use `--resume` to continue interrupted runs.
 
 ## Reference Docs
 - `docs/development-notes.md` — Stage findings, API formats, historical decisions
-- `docs/stage8-deduplicator.md` — Deduplicator design spec
