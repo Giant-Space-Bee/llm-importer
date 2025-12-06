@@ -9,13 +9,28 @@ Stage 6:
 """
 
 import asyncio
-from typing import List, Dict, Any
+from dataclasses import dataclass
+from typing import List, Dict, Any, Callable, Optional, Set
 from concurrent.futures import ThreadPoolExecutor
 
 from src.chunker import Chunk
 from src.extractor import extract_chunk, ExtractedFact
 from src.verifier import verify_all
 from src.providers import LLMProvider
+
+
+# Type alias for checkpoint callback
+# Called with (completed_indices, all_facts_so_far) after each chunk
+CheckpointCallback = Callable[[Set[int], List[ExtractedFact]], None]
+
+
+@dataclass
+class ParallelResult:
+    """Result from parallel chunk processing."""
+    facts: List[ExtractedFact]
+    completed_indices: Set[int]
+    failed_indices: List[int]
+    errors: Dict[int, Exception]
 
 
 def extract_and_verify_chunk(
@@ -107,12 +122,17 @@ async def process_chunks_parallel(
     chunks: List[Chunk],
     provider: LLMProvider,
     conversations_by_id: Dict[str, Any] = None,
-    max_concurrent: int = 5
-) -> List[ExtractedFact]:
+    max_concurrent: int = 5,
+    chunk_indices: List[int] = None,
+    on_chunk_complete: CheckpointCallback = None,
+    existing_facts: List[ExtractedFact] = None
+) -> ParallelResult:
     """
     Process chunks concurrently (for API providers).
 
     Respects rate limits via semaphore to cap concurrent requests.
+    Saves checkpoint after each chunk completes (if callback provided).
+    Continues processing even if some chunks fail.
 
     Args:
         chunks: List of chunks to process
@@ -120,43 +140,87 @@ async def process_chunks_parallel(
         conversations_by_id: Raw conversation dicts from load_conversations()
                             keyed by conversation ID. Required for verification.
         max_concurrent: Maximum concurrent requests (default 5 for Tier 1)
+        chunk_indices: Indices of chunks being processed (for checkpoint tracking).
+                      If None, uses 0..len(chunks)-1.
+        on_chunk_complete: Callback called after each chunk completes with
+                          (completed_indices, all_facts). Used for checkpointing.
+        existing_facts: Facts from previous run to include in checkpoint.
 
     Returns:
-        Combined list of verified facts from all chunks
+        ParallelResult with facts, completed indices, and any failures
     """
     if not chunks:
-        return []
+        return ParallelResult(
+            facts=[],
+            completed_indices=set(),
+            failed_indices=[],
+            errors={}
+        )
+
+    # Default indices if not provided
+    if chunk_indices is None:
+        chunk_indices = list(range(len(chunks)))
 
     semaphore = asyncio.Semaphore(max_concurrent)
     executor = ThreadPoolExecutor(max_workers=max_concurrent)
 
-    async def process_with_semaphore(chunk: Chunk) -> List[ExtractedFact]:
+    # Shared state protected by lock
+    lock = asyncio.Lock()
+    all_facts: List[ExtractedFact] = list(existing_facts) if existing_facts else []
+    completed_indices: Set[int] = set()
+
+    async def process_with_checkpoint(idx: int, chunk: Chunk) -> List[ExtractedFact]:
         async with semaphore:
-            return await extract_and_verify_chunk_async(
+            facts = await extract_and_verify_chunk_async(
                 chunk, provider, conversations_by_id, executor
             )
 
-    # Process all chunks concurrently (semaphore limits concurrency)
+            # Update shared state under lock
+            async with lock:
+                all_facts.extend(facts)
+                completed_indices.add(idx)
+
+                # Call checkpoint callback if provided
+                if on_chunk_complete:
+                    on_chunk_complete(completed_indices.copy(), list(all_facts))
+
+            return facts
+
+    # Process all chunks concurrently with return_exceptions=True
+    # This ensures one failure doesn't kill all other chunks
     results = await asyncio.gather(
-        *[process_with_semaphore(chunk) for chunk in chunks]
+        *[process_with_checkpoint(idx, chunk)
+          for idx, chunk in zip(chunk_indices, chunks)],
+        return_exceptions=True
     )
 
     executor.shutdown(wait=True)
 
-    # Flatten results
-    all_facts = []
-    for facts in results:
-        all_facts.extend(facts)
+    # Separate successes from failures
+    failed_indices = []
+    errors = {}
+    for idx, result in zip(chunk_indices, results):
+        if isinstance(result, Exception):
+            failed_indices.append(idx)
+            errors[idx] = result
 
-    return all_facts
+    return ParallelResult(
+        facts=all_facts,
+        completed_indices=completed_indices,
+        failed_indices=failed_indices,
+        errors=errors
+    )
 
 
 def process_all_chunks(
     chunks: List[Chunk],
     provider: LLMProvider,
     conversations_by_id: Dict[str, Any] = None,
-    max_concurrent: int = 5
-) -> List[ExtractedFact]:
+    max_concurrent: int = 5,
+    chunk_indices: List[int] = None,
+    on_chunk_complete: CheckpointCallback = None,
+    existing_facts: List[ExtractedFact] = None
+) -> ParallelResult:
     """
     Process all chunks using appropriate strategy based on provider type.
 
@@ -171,16 +235,31 @@ def process_all_chunks(
                             keyed by conversation ID. Required for verification.
                             Example: {c['id']: c for c in load_conversations(path)}
         max_concurrent: Max concurrent requests for parallel mode
+        chunk_indices: Indices of chunks being processed (for checkpoint tracking)
+        on_chunk_complete: Callback for checkpointing (parallel mode only)
+        existing_facts: Facts from previous run to include
 
     Returns:
-        Combined list of verified facts from all chunks
+        ParallelResult with facts, completed indices, and any failures
     """
+    if chunk_indices is None:
+        chunk_indices = list(range(len(chunks)))
+
     if provider.is_local:
-        return process_chunks_sequential(chunks, provider, conversations_by_id)
+        # Sequential mode doesn't use this function for checkpointing
+        # (handled in phase_extract directly)
+        facts = process_chunks_sequential(chunks, provider, conversations_by_id)
+        return ParallelResult(
+            facts=facts,
+            completed_indices=set(chunk_indices),
+            failed_indices=[],
+            errors={}
+        )
     else:
         # Run async parallel processing
         return asyncio.run(
             process_chunks_parallel(
-                chunks, provider, conversations_by_id, max_concurrent
+                chunks, provider, conversations_by_id, max_concurrent,
+                chunk_indices, on_chunk_complete, existing_facts
             )
         )
