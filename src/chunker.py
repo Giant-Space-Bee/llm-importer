@@ -330,9 +330,14 @@ def _create_sub_conversation(
     messages: List[Message],
     part_num: int
 ) -> Conversation:
-    """Create a sub-conversation with modified ID for traceability."""
+    """Create a sub-conversation preserving original ID for verification.
+
+    IMPORTANT: We keep the original ID so the verifier can look up the
+    full conversation and find the source_quote. Split parts are just
+    for chunking - verification needs the original conversation.
+    """
     return Conversation(
-        id=f"{original.id}_part{part_num}",
+        id=original.id,  # Keep original ID for verification lookup
         title=f"{original.title} (part {part_num})",
         create_time=original.create_time,
         messages=messages

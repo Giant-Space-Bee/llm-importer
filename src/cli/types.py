@@ -20,6 +20,7 @@ from src.chunker import Chunk
 from src.providers import LLMProvider
 from src.extractor import ExtractedFact
 from src.aggregator import AggregatedFact
+from src.deduplicator import DeduplicatedFact
 
 
 @dataclass
@@ -112,3 +113,4 @@ class PipelineContext:
     existing_facts: List[Dict[str, Any]] = field(default_factory=list)
     verified_facts: List[ExtractedFact] = field(default_factory=list)
     aggregated_facts: List[AggregatedFact] = field(default_factory=list)
+    deduplicated_facts: List[DeduplicatedFact] = field(default_factory=list)

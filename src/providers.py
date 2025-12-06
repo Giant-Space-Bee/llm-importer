@@ -187,9 +187,9 @@ class APIProvider(LLMProvider):
     Parallel execution OK with rate limiting (RPM/TPM tracking).
     """
 
-    # Tier 1 defaults (conservative)
+    # Tier 1 defaults
     DEFAULT_RPM = 5
-    DEFAULT_TPM = 20000
+    DEFAULT_TPM = 30000
     DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
     STRUCTURED_OUTPUTS_BETA = "structured-outputs-2025-11-13"
 

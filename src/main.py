@@ -98,7 +98,7 @@ def parse_args() -> argparse.Namespace:
         "--tpm",
         type=int,
         default=None,
-        help="Tokens per minute limit for API mode (default: 20000 for Tier 1)"
+        help="Tokens per minute limit for API mode (default: 30000)"
     )
     return parser.parse_args()
 

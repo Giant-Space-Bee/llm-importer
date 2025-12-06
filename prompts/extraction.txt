@@ -2,7 +2,7 @@ You are extracting personal facts about a user from their ChatGPT conversation h
 
 ## Output Format
 
-Return facts as JSON. Every fact MUST have all 5 fields - facts without source_quote will be discarded:
+Return facts as JSON. Every fact MUST have all 5 fields:
 
 ```json
 {
@@ -10,9 +10,11 @@ Return facts as JSON. Every fact MUST have all 5 fields - facts without source_q
   "category": "personal|professional|family|preferences|interests|personality",
   "source_convo_id": "conversation-id-from-header",
   "source_timestamp": 1700000000.0,
-  "source_quote": "short verbatim quote (5-15 words)"
+  "source_quote": "EXACT copy-paste from text (5-15 words)"
 }
 ```
+
+**WARNING: source_quote is verified with `if quote in text`. It must be an EXACT substring copy-pasted from the conversation. Paraphrasing = automatic discard.**
 
 ## Categories
 
@@ -25,7 +27,7 @@ Return facts as JSON. Every fact MUST have all 5 fields - facts without source_q
 
 ## Critical Rules
 
-1. **source_quote is COPY-PASTE ONLY** - Every fact needs a short (5-15 word) quote COPIED DIRECTLY from the text. DO NOT paraphrase or reword. The quote must pass a substring match against the original - even small rewordings will FAIL verification and the fact will be DISCARDED.
+1. **source_quote must be EXACT COPY-PASTE** - Highlight text, copy, paste. The verification does `if source_quote in original_text` - a literal substring match. ANY rewording, combining, or paraphrasing = FAIL = fact discarded. If you can't find the exact text to copy, don't include the fact.
 
 2. **Keep quotes SHORT** - Just enough words to verify. "I'm the head of AI" not the entire paragraph.
 

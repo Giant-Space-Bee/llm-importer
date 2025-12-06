@@ -363,7 +363,7 @@ class TestSplitConversation:
                 assert msg.content  # Not truncated
 
     def test_creates_sub_conversation_ids(self):
-        """Split parts should have traceable IDs."""
+        """Split parts should keep original ID for verification lookup."""
         convo = Conversation(
             id="original-123",
             title="Original Title",
@@ -375,11 +375,12 @@ class TestSplitConversation:
         )
         result = split_conversation(convo, max_tokens=500)
         if len(result) > 1:
-            assert result[0].id.startswith("original-123_part")
-            assert result[1].id.startswith("original-123_part")
-            # Parts should be numbered
-            assert "_part1" in result[0].id
-            assert "_part2" in result[1].id
+            # All parts keep original ID so verifier can look up the conversation
+            assert result[0].id == "original-123"
+            assert result[1].id == "original-123"
+            # Parts are numbered in the title for traceability
+            assert "(part 1)" in result[0].title
+            assert "(part 2)" in result[1].title
 
     def test_handles_single_giant_message(self):
         """Should handle conversation with single giant message."""

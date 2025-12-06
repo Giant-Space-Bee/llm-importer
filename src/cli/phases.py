@@ -22,8 +22,9 @@ from src.chunker import chunk_conversations, Chunk, DEFAULT_CHUNK_SIZE, prepare_
 from src.providers import LLMProvider, APIProvider
 from src.extractor import ExtractedFact
 from src.processor import extract_and_verify_chunk, process_all_chunks
-from src.aggregator import aggregate
-from src.checkpoint import hash_file, save_checkpoint, get_remaining_chunks
+from src.aggregator import aggregate, AggregatedFact, group_by_category
+from src.deduplicator import deduplicate, DeduplicatedFact
+from src.checkpoint import hash_file, save_checkpoint, get_remaining_chunks, load_checkpoint
 
 from src.cli.types import PipelineContext
 from src.cli.display import (
@@ -384,5 +385,94 @@ def phase_aggregate(ctx: PipelineContext) -> PipelineContext:
     else:
         console.print("\n[yellow]No facts extracted.[/yellow]")
         ctx.aggregated_facts = []
+
+    return ctx
+
+
+def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
+    """Semantically deduplicate aggregated facts using LLM.
+
+    Two-phase deduplication:
+    - Phase 1: Within-category dedup (timestamp-batched, merge-sort)
+    - Phase 2: Cross-category merge-sort (catches miscategorized duplicates)
+
+    Includes engineering data output for monitoring and improvement.
+    Saves checkpoint after completion for recovery.
+
+    Args:
+        ctx: Pipeline context with aggregated_facts and provider.
+
+    Returns:
+        Updated context with deduplicated_facts.
+
+    Example:
+        >>> ctx = phase_deduplicate(ctx)
+        >>> print(f"Deduplicated to {len(ctx.deduplicated_facts)} unique facts")
+    """
+    console = ctx.console
+    checkpoint_path = get_checkpoint_path(ctx.input_file)
+
+    # Check if dedup already completed (resume support)
+    existing_checkpoint = load_checkpoint(checkpoint_path)
+    if existing_checkpoint and existing_checkpoint.get("dedup_completed"):
+        dedup_facts_data = existing_checkpoint.get("deduplicated_facts", [])
+        ctx.deduplicated_facts = [
+            DeduplicatedFact(**f) if isinstance(f, dict) else f
+            for f in dedup_facts_data
+        ]
+        console.print(
+            f"\n[green]Dedup checkpoint found:[/green] "
+            f"{len(ctx.deduplicated_facts)} deduplicated facts loaded"
+        )
+        return ctx
+
+    if not ctx.aggregated_facts:
+        console.print("\n[yellow]No facts to deduplicate.[/yellow]")
+        ctx.deduplicated_facts = []
+        return ctx
+
+    input_count = len(ctx.aggregated_facts)
+
+    # Show category breakdown before dedup (engineering data)
+    by_category = group_by_category(ctx.aggregated_facts)
+    console.print(f"\n[bold]Deduplicating {input_count} aggregated facts...[/bold]")
+    console.print("[dim]Category breakdown before dedup:[/dim]")
+    for cat, facts in sorted(by_category.items(), key=lambda x: -len(x[1])):
+        console.print(f"  [dim]{cat}: {len(facts)}[/dim]")
+
+    # Run deduplication with timing
+    start_time = time.time()
+    try:
+        ctx.deduplicated_facts = deduplicate(ctx.aggregated_facts, ctx.provider)
+    except Exception as e:
+        console.print(f"\n[red]Dedup error:[/red] {e}")
+        console.print("[yellow]Aggregated facts preserved in checkpoint for retry.[/yellow]")
+        raise
+
+    elapsed = time.time() - start_time
+    output_count = len(ctx.deduplicated_facts)
+    reduction_pct = ((input_count - output_count) / input_count * 100) if input_count > 0 else 0
+
+    # Engineering stats
+    console.print(
+        f"  [green]Reduced {input_count} → {output_count} facts "
+        f"({reduction_pct:.1f}% reduction)[/green] [{format_elapsed_time(elapsed)}]"
+    )
+
+    # Save checkpoint with dedup results
+    save_checkpoint(checkpoint_path, {
+        "source_file_hash": hash_file(ctx.input_file),
+        "completed_chunks": list(range(len(ctx.chunks))),
+        "verified_facts": [
+            asdict(f) if isinstance(f, ExtractedFact) else f
+            for f in ctx.verified_facts
+        ],
+        "dedup_completed": True,
+        "deduplicated_facts": [
+            asdict(f) if isinstance(f, DeduplicatedFact) else f
+            for f in ctx.deduplicated_facts
+        ],
+    })
+    console.print("[dim]Dedup checkpoint saved.[/dim]")
 
     return ctx

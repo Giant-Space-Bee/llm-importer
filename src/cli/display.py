@@ -5,7 +5,8 @@ This module handles all visual output: banners, tables, progress indicators,
 and result summaries using the Rich library.
 """
 
-from typing import List, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -14,6 +15,7 @@ from rich.table import Table
 from src.parser import ConversationStats, UserProfile, ClaudeMemories
 from src.chunker import Chunk
 from src.aggregator import AggregatedFact, group_by_category
+from src.deduplicator import DeduplicatedFact
 
 
 def get_banner() -> str:
@@ -285,3 +287,66 @@ def show_results(console: Console, aggregated: List[AggregatedFact]) -> None:
                 f"  [{f.fact.category}] {f.fact.fact[:60]}{'...' if len(f.fact.fact) > 60 else ''} "
                 f"(x{f.frequency})"
             )
+
+
+def show_dedup_results(
+    console: Console,
+    facts: List[DeduplicatedFact],
+    input_count: int,
+) -> None:
+    """Display deduplicated results with reduction stats.
+
+    Shows summary table by category and lists all unique facts.
+    Includes engineering data: input count, output count, reduction ratio.
+
+    Args:
+        console: Rich console instance for output.
+        facts: List of deduplicated facts.
+        input_count: Number of facts before deduplication (for stats).
+
+    Example:
+        >>> console = Console()
+        >>> show_dedup_results(console, dedup_facts, input_count=100)
+    """
+    # Group by category
+    by_category: Dict[str, List[DeduplicatedFact]] = defaultdict(list)
+    for f in facts:
+        by_category[f.category].append(f)
+
+    # Calculate reduction
+    output_count = len(facts)
+    reduction_pct = ((input_count - output_count) / input_count * 100) if input_count > 0 else 0
+
+    # Summary table
+    summary = Table(title="Deduplication Results", show_header=True)
+    summary.add_column("Category", style="cyan")
+    summary.add_column("Facts", style="green", justify="right")
+
+    categories = ["personal", "professional", "family", "preferences", "interests", "personality"]
+    total = 0
+    for cat in categories:
+        count = len(by_category.get(cat, []))
+        total += count
+        if count > 0:
+            summary.add_row(cat, str(count))
+
+    summary.add_row("[bold]TOTAL[/bold]", f"[bold]{total}[/bold]")
+    console.print(summary)
+
+    # Engineering stats
+    console.print(
+        f"\n[dim]Dedup stats: {input_count} input → {output_count} output "
+        f"({reduction_pct:.1f}% reduction)[/dim]"
+    )
+
+    # Show all facts by category
+    if facts:
+        console.print("\n[bold]Deduplicated Facts:[/bold]")
+        for cat in categories:
+            cat_facts = by_category.get(cat, [])
+            if cat_facts:
+                console.print(f"\n  [cyan]{cat.upper()}[/cyan]")
+                for f in cat_facts:
+                    # Truncate long facts for display
+                    display_fact = f.fact[:80] + "..." if len(f.fact) > 80 else f.fact
+                    console.print(f"    - {display_fact}")
