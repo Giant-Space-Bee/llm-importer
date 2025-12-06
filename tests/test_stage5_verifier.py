@@ -254,3 +254,42 @@ class TestVerifyAll:
         verified, discarded, _ = verify_all(facts, conversations)
 
         assert verified[0] is original_fact  # Same object reference
+
+    def test_fallback_finds_quote_in_different_conversation(self):
+        """Should verify fact if quote found in ANY conversation (wrong ID fix)."""
+        from src.verifier import verify_all
+
+        # Fact has wrong conversation ID, but quote exists in conv-2
+        facts = [
+            {"fact": "User loves Seattle", "source_quote": "I love Seattle", "source_convo_id": "conv-WRONG"},
+        ]
+        conversations = {
+            "conv-1": "Hello there",
+            "conv-2": "I love Seattle so much",  # Quote is actually here
+            "conv-3": "Goodbye",
+        }
+
+        verified, discarded, _ = verify_all(facts, conversations)
+
+        assert len(verified) == 1
+        assert len(discarded) == 0
+        # Should have corrected the ID
+        assert verified[0]["source_convo_id"] == "conv-2"
+
+    def test_fallback_does_not_find_hallucinated_quote(self):
+        """Should discard if quote not found in ANY conversation."""
+        from src.verifier import verify_all
+
+        facts = [
+            {"fact": "User loves Portland", "source_quote": "I love Portland", "source_convo_id": "conv-1"},
+        ]
+        conversations = {
+            "conv-1": "Hello there",
+            "conv-2": "I love Seattle",  # Different city
+            "conv-3": "Goodbye",
+        }
+
+        verified, discarded, _ = verify_all(facts, conversations)
+
+        assert len(verified) == 0
+        assert len(discarded) == 1  # True hallucination
