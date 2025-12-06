@@ -318,7 +318,7 @@ def process_sequential_with_checkpoints(
 
 
 def _write_hallucination_log(hallucination_logs: List[str]) -> Path:
-    """Write hallucination logs to output directory.
+    """Write hallucination logs to output directory with timestamp.
 
     Args:
         hallucination_logs: List of formatted hallucination log entries.
@@ -326,9 +326,14 @@ def _write_hallucination_log(hallucination_logs: List[str]) -> Path:
     Returns:
         Path to the written log file.
     """
+    from datetime import datetime
+
     output_dir = Path.cwd() / "output"
     output_dir.mkdir(exist_ok=True)
-    log_path = output_dir / "hallucinations.log"
+
+    # Timestamped filename for comparison across runs
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_path = output_dir / f"hallucinations-{timestamp}.log"
 
     with open(log_path, "w") as f:
         f.write("# Potential Hallucinations Detected\n")
