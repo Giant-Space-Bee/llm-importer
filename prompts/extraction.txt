@@ -1,5 +1,51 @@
 You are extracting personal facts about a user from their ChatGPT conversation history. Your goal is to build a profile that helps a new AI assistant understand this person.
 
+---
+
+## QUOTE VERIFICATION (Read This First)
+
+Every `source_quote` is verified with this exact check:
+
+```python
+if normalize(source_quote) in normalize(conversation_text):
+    keep(fact)
+else:
+    discard(fact)  # Thrown away as hallucination
+```
+
+This is a **literal substring search**. Not semantic. Not fuzzy. Not "close enough."
+
+**If your quote doesn't exist EXACTLY as a contiguous string, the fact is DELETED.**
+
+### What Gets Your Fact Deleted
+
+| You Write | Original Was | Result |
+|-----------|--------------|--------|
+| `"the user"` or `"they"` | `"I"` or `"me"` | DELETED |
+| `"biweekly"` | `"bi weekly"` or `"bi-weekly"` | DELETED |
+| `"head of AI at EvolveWell"` | `"head of AI"` (msg 1) + `"EvolveWell"` (msg 5) | DELETED |
+| `"Lily is interested in Harry Potter"` | `"lily's 9 3/4 day so we can do the Harry potter thing"` | DELETED |
+| `"Has an electric vehicle"` | `"EV charging (Eevee)"` | DELETED |
+
+### The Right Mental Model
+
+**The quote is an ANCHOR, not a proof.**
+
+- Its job is to locate WHERE in the conversation the fact came from
+- It does NOT need to contain all the context
+- Put the full picture in `fact`, keep `source_quote` short and verbatim
+
+### The Safe Strategy
+
+1. **Quote LESS, not more** - 5-10 words is ideal, 15 max
+2. **Copy the user's EXACT words** - typos, informal spelling, weird punctuation, ALL of it
+3. **Never replace pronouns** - if user said "me", quote "me" not "the user"
+4. **Never clean up grammar** - if user said "bi weekly", quote "bi weekly"
+5. **Never combine messages** - if info is in two places, pick ONE place to quote
+6. **When in doubt, skip the fact** - a missing fact beats a deleted one
+
+---
+
 ## Output Format
 
 Return facts as JSON. Every fact MUST have all 5 fields:
@@ -14,7 +60,7 @@ Return facts as JSON. Every fact MUST have all 5 fields:
 }
 ```
 
-**WARNING: source_quote is verified with `if quote in text`. It must be an EXACT substring copy-pasted from the conversation. Paraphrasing = automatic discard.**
+**See "Quote Verification" section above. This is the #1 cause of fact rejection.**
 
 ## Categories
 
@@ -27,7 +73,7 @@ Return facts as JSON. Every fact MUST have all 5 fields:
 
 ## Critical Rules
 
-1. **source_quote must be EXACT COPY-PASTE** - Highlight text, copy, paste. The verification does `if source_quote in original_text` - a literal substring match. ANY rewording, combining, or paraphrasing = FAIL = fact discarded. If you can't find the exact text to copy, don't include the fact.
+1. **source_quote = verbatim anchor** - Copy 5-15 words EXACTLY from the user's message. See "Quote Verification" above. Shorter is safer. Context goes in `fact`, not in the quote.
 
 2. **Keep quotes SHORT** - Just enough words to verify. "I'm the head of AI" not the entire paragraph.
 
@@ -100,6 +146,57 @@ BAD - reordered quote (WILL FAIL verification):
 }
 ```
 Why it fails: Original text said "I'm the head of AI" and "at EvolveWell" separately. Don't combine/reorder - copy ONE exact substring: "I'm the head of AI"
+
+BAD - pronoun replacement (WILL FAIL verification):
+```json
+{
+  "fact": "Rod wants to hire the user to build a platform",
+  "source_quote": "Rod wants the user to build a platform"
+}
+```
+Why it fails: Original said "Rod wants **me** to build" - you replaced "me" with "the user". Quote the original: "Rod wants me to build"
+
+BAD - grammar cleanup (WILL FAIL verification):
+```json
+{
+  "fact": "Haley earns $1,252 biweekly until mid-January",
+  "source_quote": "Haley's $1,252 biweekly until mid-January"
+}
+```
+Why it fails: Original said "$1,252/bi weekly until mid january" with slash, space, lowercase. You cleaned it up. Quote exactly: "$1,252/bi weekly until mid january"
+
+BAD - meaning extraction instead of quoting (WILL FAIL verification):
+```json
+{
+  "fact": "Has an electric vehicle named Eevee",
+  "source_quote": "Has an electric vehicle called Eevee"
+}
+```
+Why it fails: Original said "EV charging (Eevee)" - you wrote a summary, not a quote. Quote the original: "EV charging (Eevee)"
+
+GOOD - short anchor with context in fact:
+```json
+{
+  "fact": "Works as Head of AI at EvolveWell, a coaching platform",
+  "category": "professional",
+  "source_convo_id": "abc-123",
+  "source_timestamp": 1700000000.0,
+  "source_quote": "head of AI"
+}
+```
+Why it works: "head of AI" exists verbatim. The company name and context go in `fact`, not `source_quote`.
+
+GOOD - preserving informal language:
+```json
+{
+  "fact": "Haley earns $1,252 biweekly until mid-January",
+  "category": "family",
+  "source_convo_id": "xyz-789",
+  "source_timestamp": 1700000000.0,
+  "source_quote": "$1,252/bi weekly until mid january"
+}
+```
+Why it works: Quote matches original exactly including weird formatting. Fact has the cleaned-up version.
 
 ## Edge Cases
 
