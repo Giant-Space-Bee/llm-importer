@@ -75,10 +75,13 @@ def phase_parse(ctx: PipelineContext) -> PipelineContext:
 
     # Load raw conversations for verification (need full message tree)
     raw_convos = load_conversations(ctx.input_file)
-    conversations_by_id = {c["id"]: c for c in raw_convos}
 
-    # Detect export type
+    # Detect export type first (determines which ID field to use)
     export_type = detect_export_type(raw_convos)
+
+    # Build lookup using correct ID field (ChatGPT uses 'id', Claude uses 'uuid')
+    id_field = "uuid" if export_type == "claude" else "id"
+    conversations_by_id = {c[id_field]: c for c in raw_convos}
 
     # Show stats
     show_stats_table(console, stats)
