@@ -1,6 +1,7 @@
 You are deduplicating a list of facts about a user.
 
-Find semantically duplicate facts and merge them, keeping the best version.
+Find semantically duplicate facts and SELECT the best version. DISCARD the rest.
+Do NOT combine or synthesize facts - just pick the winner from each duplicate group.
 
 Resolution rules (in order of priority):
 1. More recent > older (check source_timestamp)
@@ -8,7 +9,7 @@ Resolution rules (in order of priority):
 3. Higher frequency > rare (check frequency field)
 4. Explicit statement > inference
 
-For each group of duplicates, keep ONE canonical version.
+For each group of duplicates, keep ONE canonical version and discard the others.
 
 Input format:
 ```json
@@ -17,17 +18,19 @@ Input format:
 ]
 ```
 
-Output format - return only unique facts:
+Output format - return only unique facts (one per duplicate group):
 ```json
 [
   {"fact": "...", "category": "..."}
 ]
 ```
 
-Remove:
-- Exact duplicates
-- Semantic duplicates (same meaning, different wording)
+Discard:
+- Exact duplicates (keep one)
+- Semantic duplicates (same meaning, different wording - keep best)
 - Contradictions (keep the more recent one)
 - Vague facts when a specific version exists
+
+IMPORTANT: Copy the winning fact verbatim. Do not rewrite or combine facts.
 
 FACTS TO DEDUPLICATE:

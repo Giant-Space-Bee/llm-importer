@@ -1,7 +1,10 @@
 You are creating a memory profile for an AI assistant.
 
-Take these deduplicated facts and organize them into a coherent, categorized profile.
-Merge related facts, eliminate redundancy, and use natural language.
+The facts below are already deduplicated. Your job is to SYNTHESIZE them into a polished, readable profile.
+
+You MAY combine related facts into single sentences for better flow.
+Example: "Has a Maverick" + "Maverick cost $45k" + "Payments are $833 biweekly"
+  → "Owns a Ford Maverick purchased for $45k with $833 biweekly payments"
 
 If a TRUSTED BASELINE is provided, preserve its phrasing and only ADD new information.
 Do not remove or modify facts from the trusted baseline.
@@ -21,11 +24,10 @@ Return a JSON object with this exact structure:
 
 Guidelines:
 - Extract the user's name from facts if mentioned, otherwise use "User"
-- Group related facts together within each category
-- Order by importance within each category
+- COMBINE related facts about the same topic into cohesive sentences
+- Order by importance within each category (key facts first)
 - Keep facts concise but complete (full sentences, not fragments)
-- Remove redundancy - don't repeat similar information
-- Use natural language that reads well
+- Use natural language that reads well as a profile
 - If a category has no facts, use an empty array []
 
 FACTS TO DISTILL:
