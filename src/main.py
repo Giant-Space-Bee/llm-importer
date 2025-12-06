@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Load .env file (for ANTHROPIC_API_KEY, etc.)
 
 import argparse
+import time
 
 from rich.console import Console
 
@@ -34,6 +35,7 @@ from src.cli import (
     show_results,
     show_dedup_results,
     show_final_results,
+    show_pipeline_summary,
     # Validation
     DEFAULT_INPUT_PATH,
     SUPPORTED_EXPORTS,
@@ -129,6 +131,8 @@ def main() -> int:
     """
     args = parse_args()
     console = Console()
+    pipeline_start = time.time()
+
     show_banner(console)
 
     # Validate input file
@@ -146,6 +150,7 @@ def main() -> int:
         resume_mode=args.resume,
         tpm_override=args.tpm,
     )
+    ctx.pipeline_start_time = pipeline_start
 
     # Run phases
     try:
@@ -167,16 +172,19 @@ def main() -> int:
             console.print("[dim]Make sure LM Studio is running at http://127.0.0.1:1234[/dim]")
         return 1
 
-    # Show results
-    if ctx.distilled_profile and ctx.output_md_path:
-        show_final_results(
-            console,
-            ctx.distilled_profile,
-            ctx.output_md_path,
-            ctx.output_json_path,
-        )
+    # Show pipeline summary
+    total_elapsed = time.time() - pipeline_start
+    show_pipeline_summary(
+        console=console,
+        stats=ctx.stats,
+        verified_count=len(ctx.verified_facts),
+        hallucination_count=ctx.hallucination_count,
+        dedup_count=len(ctx.deduplicated_facts),
+        input_count=len(ctx.aggregated_facts),
+        total_elapsed=total_elapsed,
+        output_path=ctx.output_md_path,
+    )
 
-    console.print("\n[green]Done![/green]")
     return 0
 
 

@@ -113,7 +113,7 @@ def verify_fact(fact: Fact, conversation_text: str) -> VerificationResult:
 def verify_all(
     facts: List[Fact],
     conversations: Dict[str, Any]
-) -> Tuple[List[Fact], List[Fact]]:
+) -> Tuple[List[Fact], List[Fact], List[str]]:
     """
     Verify all facts, separate into verified and discarded.
 
@@ -122,11 +122,14 @@ def verify_all(
         conversations: Dict mapping convo_id -> raw conversation dict (ChatGPT or Claude format)
 
     Returns:
+        Tuple of:
         - verified: facts where source_quote was found
         - discarded: facts where source_quote was NOT found (hallucinations)
+        - hallucination_logs: log strings for each hallucination (for file output)
     """
     verified = []
     discarded = []
+    hallucination_logs = []
 
     for fact in facts:
         convo_id = get_fact_attr(fact, "source_convo_id", "")
@@ -138,7 +141,7 @@ def verify_all(
         # If conversation not found, fail verification
         if not convo_text:
             discarded.append(fact)
-            log_hallucination(fact, "conversation not found")
+            hallucination_logs.append(format_hallucination(fact, "conversation not found"))
             continue
 
         result = verify_fact(fact, convo_text)
@@ -147,9 +150,9 @@ def verify_all(
             verified.append(fact)
         else:
             discarded.append(fact)
-            log_hallucination(fact, result.match_location)
+            hallucination_logs.append(format_hallucination(fact, result.match_location))
 
-    return verified, discarded
+    return verified, discarded, hallucination_logs
 
 
 def normalize_text(text: str) -> str:
@@ -194,16 +197,32 @@ def normalize_text(text: str) -> str:
     return text
 
 
+def format_hallucination(fact: Fact, reason: str = "") -> str:
+    """
+    Format a hallucination log entry.
+
+    Args:
+        fact: The fact (dict or ExtractedFact) that failed verification
+        reason: Why it failed (e.g., "NOT FOUND", "conversation not found")
+
+    Returns:
+        Formatted log string for the hallucination
+    """
+    quote = get_fact_attr(fact, "source_quote", "")[:100]
+    fact_text = get_fact_attr(fact, "fact", "")[:100]
+    convo_id = get_fact_attr(fact, "source_convo_id", "unknown")
+    return f"[{reason}] Fact: '{fact_text}...'\n  Quote: '{quote}...'\n  Conversation: {convo_id}"
+
+
 def log_hallucination(fact: Fact, reason: str = "") -> None:
     """
-    Log a discarded hallucination for debugging.
+    Log a discarded hallucination for debugging (deprecated).
+
+    Use format_hallucination() instead and collect logs for file output.
 
     Args:
         fact: The fact (dict or ExtractedFact) that failed verification
         reason: Why it failed (e.g., "NOT FOUND", "conversation not found")
     """
-    # For now, just print to stderr. Later can write to file.
     import sys
-    quote = get_fact_attr(fact, "source_quote", "")[:50]
-    fact_text = get_fact_attr(fact, "fact", "")[:50]
-    print(f"[HALLUCINATION] {reason}: '{quote}...' -> '{fact_text}...'", file=sys.stderr)
+    print(format_hallucination(fact, reason), file=sys.stderr)

@@ -123,3 +123,9 @@ class PipelineContext:
     distilled_profile: Optional[DistilledProfile] = None
     output_md_path: Optional[Path] = None
     output_json_path: Optional[Path] = None
+
+    # Timing and stats tracking
+    phase_timings: Dict[str, float] = field(default_factory=dict)
+    pipeline_start_time: Optional[float] = None
+    hallucination_count: int = 0
+    hallucination_details: List[str] = field(default_factory=list)

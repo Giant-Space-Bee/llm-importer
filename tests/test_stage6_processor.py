@@ -18,6 +18,7 @@ from src.processor import (
     process_chunks_sequential,
     process_chunks_parallel,
     process_all_chunks,
+    ChunkResult,
 )
 from src.providers import LLMProvider
 from src.chunker import Chunk
@@ -69,7 +70,7 @@ class TestProcessChunksSequential:
         chunks = [make_test_chunk(i) for i in range(3)]
 
         with patch('src.processor.extract_and_verify_chunk') as mock_extract:
-            mock_extract.return_value = []
+            mock_extract.return_value = ChunkResult(facts=[], hallucination_logs=[])
             result = process_chunks_sequential(chunks, provider)
 
         assert mock_extract.call_count == 3
@@ -83,18 +84,18 @@ class TestProcessChunksSequential:
 
         with patch('src.processor.extract_and_verify_chunk') as mock_extract:
             mock_extract.side_effect = [
-                [fake_fact],
-                [fake_fact, fake_fact]
+                ChunkResult(facts=[fake_fact], hallucination_logs=[]),
+                ChunkResult(facts=[fake_fact, fake_fact], hallucination_logs=[])
             ]
             result = process_chunks_sequential(chunks, provider)
 
-        assert len(result) == 3
+        assert len(result.facts) == 3
 
     def test_empty_chunks_returns_empty(self):
         """Should handle empty chunk list."""
         provider = MockProvider(is_local=True)
         result = process_chunks_sequential([], provider)
-        assert result == []
+        assert result.facts == []
 
 
 class TestProcessChunksParallel:
@@ -107,7 +108,7 @@ class TestProcessChunksParallel:
         chunks = [make_test_chunk(i) for i in range(5)]
 
         with patch('src.processor.extract_and_verify_chunk_async') as mock_extract:
-            mock_extract.return_value = []
+            mock_extract.return_value = ChunkResult(facts=[], hallucination_logs=[])
             result = await process_chunks_parallel(chunks, provider)
 
         assert mock_extract.call_count == 5
@@ -127,7 +128,7 @@ class TestProcessChunksParallel:
             max_concurrent = max(max_concurrent, concurrent_count)
             await asyncio.sleep(0.01)  # Simulate work
             concurrent_count -= 1
-            return []
+            return ChunkResult(facts=[], hallucination_logs=[])
 
         with patch('src.processor.extract_and_verify_chunk_async', side_effect=track_concurrency):
             result = await process_chunks_parallel(chunks, provider, max_concurrent=3)
@@ -144,7 +145,8 @@ class TestProcessChunksParallel:
 
         async def mock_extract(chunk, *args, **kwargs):
             # Return facts based on chunk id
-            return [fake_fact] * (chunk.id + 1)  # 1, 2, 3 facts
+            facts = [fake_fact] * (chunk.id + 1)  # 1, 2, 3 facts
+            return ChunkResult(facts=facts, hallucination_logs=[])
 
         with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
             result = await process_chunks_parallel(chunks, provider)
@@ -168,7 +170,10 @@ class TestProcessChunksParallelFailure:
             call_count += 1
             if call_count == 3:  # Third chunk fails
                 raise ValueError("Simulated API error")
-            return [{"fact": f"fact-{call_count}", "category": "personal"}]
+            return ChunkResult(
+                facts=[{"fact": f"fact-{call_count}", "category": "personal"}],
+                hallucination_logs=[]
+            )
 
         with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
             result = await process_chunks_parallel(chunks, provider)
@@ -194,7 +199,10 @@ class TestProcessChunksParallelFailure:
             checkpoint_calls.append((completed_indices.copy(), len(facts)))
 
         async def mock_extract(*args, **kwargs):
-            return [{"fact": "test", "category": "personal"}]
+            return ChunkResult(
+                facts=[{"fact": "test", "category": "personal"}],
+                hallucination_logs=[]
+            )
 
         with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
             result = await process_chunks_parallel(
@@ -224,7 +232,10 @@ class TestProcessChunksParallelFailure:
             # Use chunk id to determine failure (chunk 2 fails)
             if chunk.id == 2:
                 raise ValueError("Simulated error")
-            return [{"fact": f"fact-{chunk.id}", "category": "personal"}]
+            return ChunkResult(
+                facts=[{"fact": f"fact-{chunk.id}", "category": "personal"}],
+                hallucination_logs=[]
+            )
 
         with patch('src.processor.extract_and_verify_chunk_async', side_effect=mock_extract):
             result = await process_chunks_parallel(
@@ -245,11 +256,15 @@ class TestProcessAllChunks:
 
     def test_uses_sequential_for_local(self):
         """Should use sequential processing for local provider."""
+        from src.processor import ParallelResult
         provider = MockProvider(is_local=True)
         chunks = [make_test_chunk(0)]
 
         with patch('src.processor.process_chunks_sequential') as mock_seq:
-            mock_seq.return_value = []
+            mock_seq.return_value = ParallelResult(
+                facts=[], completed_indices=set(), failed_indices=[], errors={},
+                hallucination_logs=[]
+            )
             process_all_chunks(chunks, provider)
 
         mock_seq.assert_called_once()
@@ -265,7 +280,8 @@ class TestProcessAllChunks:
                 facts=[],
                 completed_indices=set(),
                 failed_indices=[],
-                errors={}
+                errors={},
+                hallucination_logs=[]
             )
             process_all_chunks(chunks, provider)
 
@@ -280,7 +296,7 @@ class TestProcessAllChunks:
         fake_fact = {"fact": "test", "category": "personal"}
 
         with patch('src.processor.extract_and_verify_chunk') as mock_extract:
-            mock_extract.return_value = [fake_fact]
+            mock_extract.return_value = ChunkResult(facts=[fake_fact], hallucination_logs=[])
             result = process_all_chunks(chunks, provider)
 
         assert isinstance(result, ParallelResult)

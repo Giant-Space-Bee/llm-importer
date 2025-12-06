@@ -25,19 +25,31 @@ CheckpointCallback = Callable[[Set[int], List[ExtractedFact]], None]
 
 
 @dataclass
+class ChunkResult:
+    """Result from processing a single chunk."""
+    facts: List[ExtractedFact]
+    hallucination_logs: List[str]
+
+
+@dataclass
 class ParallelResult:
     """Result from parallel chunk processing."""
     facts: List[ExtractedFact]
     completed_indices: Set[int]
     failed_indices: List[int]
     errors: Dict[int, Exception]
+    hallucination_logs: List[str] = None
+
+    def __post_init__(self):
+        if self.hallucination_logs is None:
+            self.hallucination_logs = []
 
 
 def extract_and_verify_chunk(
     chunk: Chunk,
     provider: LLMProvider,
     conversations_by_id: Dict[str, Any] = None
-) -> List[ExtractedFact]:
+) -> ChunkResult:
     """
     Extract facts from chunk and verify them.
 
@@ -52,22 +64,22 @@ def extract_and_verify_chunk(
                             If None, skips verification.
 
     Returns:
-        List of verified ExtractedFact objects
+        ChunkResult with verified facts and hallucination logs
     """
     # Extract facts from chunk
     extracted = extract_chunk(chunk, provider)
 
     if not extracted:
-        return []
+        return ChunkResult(facts=[], hallucination_logs=[])
 
     # If no conversations dict provided, skip verification
     # (used in testing or when verification happens later)
     if conversations_by_id is None:
-        return extracted
+        return ChunkResult(facts=extracted, hallucination_logs=[])
 
     # Verify facts against source conversations
-    verified, _ = verify_all(extracted, conversations_by_id)
-    return verified
+    verified, _, hallucination_logs = verify_all(extracted, conversations_by_id)
+    return ChunkResult(facts=verified, hallucination_logs=hallucination_logs)
 
 
 async def extract_and_verify_chunk_async(
@@ -75,7 +87,7 @@ async def extract_and_verify_chunk_async(
     provider: LLMProvider,
     conversations_by_id: Dict[str, Any] = None,
     executor: ThreadPoolExecutor = None
-) -> List[ExtractedFact]:
+) -> ChunkResult:
     """
     Async wrapper for extract_and_verify_chunk.
 
@@ -96,7 +108,7 @@ def process_chunks_sequential(
     chunks: List[Chunk],
     provider: LLMProvider,
     conversations_by_id: Dict[str, Any] = None
-) -> List[ExtractedFact]:
+) -> ParallelResult:
     """
     Process chunks one at a time (for local LLMs).
 
@@ -107,15 +119,23 @@ def process_chunks_sequential(
                             keyed by conversation ID. Required for verification.
 
     Returns:
-        Combined list of verified facts from all chunks
+        ParallelResult with verified facts and hallucination logs
     """
     all_facts = []
+    all_hallucinations = []
 
     for chunk in chunks:
-        facts = extract_and_verify_chunk(chunk, provider, conversations_by_id)
-        all_facts.extend(facts)
+        result = extract_and_verify_chunk(chunk, provider, conversations_by_id)
+        all_facts.extend(result.facts)
+        all_hallucinations.extend(result.hallucination_logs)
 
-    return all_facts
+    return ParallelResult(
+        facts=all_facts,
+        completed_indices=set(range(len(chunks))),
+        failed_indices=[],
+        errors={},
+        hallucination_logs=all_hallucinations
+    )
 
 
 async def process_chunks_parallel(
@@ -147,14 +167,15 @@ async def process_chunks_parallel(
         existing_facts: Facts from previous run to include in checkpoint.
 
     Returns:
-        ParallelResult with facts, completed indices, and any failures
+        ParallelResult with facts, completed indices, failures, and hallucination logs
     """
     if not chunks:
         return ParallelResult(
             facts=[],
             completed_indices=set(),
             failed_indices=[],
-            errors={}
+            errors={},
+            hallucination_logs=[]
         )
 
     # Default indices if not provided
@@ -167,24 +188,26 @@ async def process_chunks_parallel(
     # Shared state protected by lock
     lock = asyncio.Lock()
     all_facts: List[ExtractedFact] = list(existing_facts) if existing_facts else []
+    all_hallucinations: List[str] = []
     completed_indices: Set[int] = set()
 
-    async def process_with_checkpoint(idx: int, chunk: Chunk) -> List[ExtractedFact]:
+    async def process_with_checkpoint(idx: int, chunk: Chunk) -> ChunkResult:
         async with semaphore:
-            facts = await extract_and_verify_chunk_async(
+            result = await extract_and_verify_chunk_async(
                 chunk, provider, conversations_by_id, executor
             )
 
             # Update shared state under lock
             async with lock:
-                all_facts.extend(facts)
+                all_facts.extend(result.facts)
+                all_hallucinations.extend(result.hallucination_logs)
                 completed_indices.add(idx)
 
                 # Call checkpoint callback if provided
                 if on_chunk_complete:
                     on_chunk_complete(completed_indices.copy(), list(all_facts))
 
-            return facts
+            return result
 
     # Process all chunks concurrently with return_exceptions=True
     # This ensures one failure doesn't kill all other chunks
@@ -208,7 +231,8 @@ async def process_chunks_parallel(
         facts=all_facts,
         completed_indices=completed_indices,
         failed_indices=failed_indices,
-        errors=errors
+        errors=errors,
+        hallucination_logs=all_hallucinations
     )
 
 
@@ -240,21 +264,14 @@ def process_all_chunks(
         existing_facts: Facts from previous run to include
 
     Returns:
-        ParallelResult with facts, completed indices, and any failures
+        ParallelResult with facts, completed indices, failures, and hallucination logs
     """
     if chunk_indices is None:
         chunk_indices = list(range(len(chunks)))
 
     if provider.is_local:
-        # Sequential mode doesn't use this function for checkpointing
-        # (handled in phase_extract directly)
-        facts = process_chunks_sequential(chunks, provider, conversations_by_id)
-        return ParallelResult(
-            facts=facts,
-            completed_indices=set(chunk_indices),
-            failed_indices=[],
-            errors={}
-        )
+        # Sequential mode - process_chunks_sequential now returns ParallelResult
+        return process_chunks_sequential(chunks, provider, conversations_by_id)
     else:
         # Run async parallel processing
         return asyncio.run(

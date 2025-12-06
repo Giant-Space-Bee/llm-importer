@@ -22,7 +22,7 @@ from src.parser import (
 from src.chunker import chunk_conversations, Chunk, DEFAULT_CHUNK_SIZE, prepare_conversations
 from src.providers import LLMProvider, APIProvider
 from src.extractor import ExtractedFact
-from src.processor import extract_and_verify_chunk, process_all_chunks, ParallelResult
+from src.processor import extract_and_verify_chunk, process_all_chunks, ParallelResult, ChunkResult
 from src.aggregator import aggregate, AggregatedFact, group_by_category
 from src.deduplicator import deduplicate, DeduplicatedFact
 from src.distiller import distill, DistilledProfile, write_markdown, write_json
@@ -35,6 +35,8 @@ from src.cli.display import (
     show_user_profile_preview,
     show_claude_memories_preview,
     show_chunk_table,
+    show_phase_header,
+    show_phase_complete,
 )
 from src.cli.validation import find_memories_json
 from src.cli.providers import select_provider as _select_provider
@@ -70,9 +72,9 @@ def phase_parse(ctx: PipelineContext) -> PipelineContext:
         >>> print(f"Found {len(ctx.conversations)} conversations")
     """
     console = ctx.console
+    start_time = time.time()
 
-    # Parse conversations
-    console.print("\n[bold]Loading and parsing conversations...[/bold]")
+    show_phase_header(console, 1, "PARSE")
     conversations, user_profile = parse_all(ctx.input_file)
     stats = get_stats_from_parsed(conversations, user_profile)
 
@@ -119,6 +121,10 @@ def phase_parse(ctx: PipelineContext) -> PipelineContext:
     ctx.stats = stats
     ctx.export_type = export_type
 
+    elapsed = time.time() - start_time
+    ctx.phase_timings["parse"] = elapsed
+    show_phase_complete(console, elapsed)
+
     return ctx
 
 
@@ -159,6 +165,9 @@ def phase_chunk(ctx: PipelineContext) -> PipelineContext:
     """
     console = ctx.console
     conversations = ctx.conversations
+    start_time = time.time()
+
+    show_phase_header(console, 2, "CHUNK")
 
     # Determine chunk size based on mode and provider
     if ctx.demo_mode:
@@ -198,6 +207,10 @@ def phase_chunk(ctx: PipelineContext) -> PipelineContext:
 
     ctx.chunks = chunks
     show_chunk_table(console, chunks)
+
+    elapsed = time.time() - start_time
+    ctx.phase_timings["chunk"] = elapsed
+    show_phase_complete(console, elapsed)
 
     return ctx
 
@@ -241,7 +254,7 @@ def phase_check_resume(ctx: PipelineContext) -> PipelineContext:
 
 def process_sequential_with_checkpoints(
     ctx: PipelineContext,
-) -> List[ExtractedFact]:
+) -> tuple[List[ExtractedFact], List[str]]:
     """Process chunks sequentially with per-chunk checkpointing.
 
     Used for local LLM where each chunk takes minutes.
@@ -251,10 +264,10 @@ def process_sequential_with_checkpoints(
         ctx: Pipeline context with chunks, provider, and checkpoint state.
 
     Returns:
-        All verified facts (existing + new).
+        Tuple of (all verified facts, hallucination logs).
 
     Example:
-        >>> facts = process_sequential_with_checkpoints(ctx)
+        >>> facts, hallucinations = process_sequential_with_checkpoints(ctx)
         >>> print(f"Extracted {len(facts)} total facts")
     """
     console = ctx.console
@@ -267,6 +280,7 @@ def process_sequential_with_checkpoints(
 
     checkpoint_path = get_checkpoint_path(input_file)
     all_facts: List[Any] = list(existing_facts)
+    all_hallucinations: List[str] = []
     completed = set(range(len(chunks))) - set(remaining_indices)
 
     for chunk_idx in remaining_indices:
@@ -279,12 +293,13 @@ def process_sequential_with_checkpoints(
         )
 
         # Extract and verify
-        new_facts = extract_and_verify_chunk(chunk, provider, conversations_by_id)
-        all_facts.extend(new_facts)
+        result: ChunkResult = extract_and_verify_chunk(chunk, provider, conversations_by_id)
+        all_facts.extend(result.facts)
+        all_hallucinations.extend(result.hallucination_logs)
 
         elapsed = time.time() - start_time
         console.print(
-            f"  [green]+{len(new_facts)} verified facts[/green] "
+            f"  [green]+{len(result.facts)} verified facts[/green] "
             f"({len(all_facts)} total) [{format_elapsed_time(elapsed)}]"
         )
 
@@ -299,19 +314,48 @@ def process_sequential_with_checkpoints(
             ]
         })
 
-    return all_facts  # type: ignore
+    return all_facts, all_hallucinations  # type: ignore
+
+
+def _write_hallucination_log(hallucination_logs: List[str]) -> Path:
+    """Write hallucination logs to output directory with timestamp.
+
+    Args:
+        hallucination_logs: List of formatted hallucination log entries.
+
+    Returns:
+        Path to the written log file.
+    """
+    from datetime import datetime
+
+    output_dir = Path.cwd() / "output"
+    output_dir.mkdir(exist_ok=True)
+
+    # Timestamped filename for comparison across runs
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_path = output_dir / f"hallucinations-{timestamp}.log"
+
+    with open(log_path, "w") as f:
+        f.write("# Potential Hallucinations Detected\n")
+        f.write("# These facts had source_quote values that couldn't be found in the original conversations.\n")
+        f.write("# This may indicate LLM hallucination or quote normalization issues.\n\n")
+        for entry in hallucination_logs:
+            f.write(entry + "\n\n")
+
+    return log_path
 
 
 def phase_extract(ctx: PipelineContext) -> PipelineContext:
     """Run extraction on all remaining chunks.
 
     Uses sequential processing for local LLM or parallel for API.
+    Writes hallucination logs to output/hallucinations.log.
 
     Args:
         ctx: Pipeline context with chunks and provider.
 
     Returns:
-        Updated context with verified_facts.
+        Updated context with verified_facts and hallucination_count.
 
     Raises:
         KeyboardInterrupt: If user interrupts processing.
@@ -322,6 +366,9 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
     """
     console = ctx.console
     provider = ctx.provider
+    start_time = time.time()
+
+    show_phase_header(console, 3, "EXTRACTION")
 
     if not ctx.remaining_indices:
         # All chunks already processed
@@ -329,14 +376,16 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
             ExtractedFact(**f) if isinstance(f, dict) else f
             for f in ctx.existing_facts
         ]
+        console.print("[green]All chunks already processed![/green]")
         return ctx
+
+    hallucination_logs: List[str] = []
 
     if provider.is_local:
         # Local LLM: sequential with per-chunk checkpointing
-        verified_facts = process_sequential_with_checkpoints(ctx)
+        verified_facts, hallucination_logs = process_sequential_with_checkpoints(ctx)
     else:
         # API: parallel processing with per-chunk checkpointing
-        start_time = time.time()
         checkpoint_path = get_checkpoint_path(ctx.input_file)
         file_hash = hash_file(ctx.input_file)
 
@@ -344,7 +393,8 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
         chunks_to_process = [ctx.chunks[i] for i in ctx.remaining_indices]
 
         console.print(
-            f"[dim]Processing {len(chunks_to_process)} chunks in parallel...[/dim]"
+            f"Processing {len(chunks_to_process)} chunks in parallel "
+            f"({ctx.max_concurrent} concurrent)..."
         )
 
         # Checkpoint callback - saves after each chunk completes
@@ -368,7 +418,7 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
             existing_facts=list(ctx.existing_facts)
         )
 
-        elapsed = time.time() - start_time
+        hallucination_logs = result.hallucination_logs
 
         # Report results
         if result.failed_indices:
@@ -383,15 +433,31 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
                 "[dim]Successful chunks have been checkpointed. "
                 "Re-run with --resume to retry failed chunks.[/dim]"
             )
-        else:
-            console.print(
-                f"  [green]Extracted {len(result.facts) - len(ctx.existing_facts)} "
-                f"new verified facts[/green] [{format_elapsed_time(elapsed)}]"
-            )
 
         verified_facts = result.facts
 
+    elapsed = time.time() - start_time
+
+    # Store hallucination count in context
+    ctx.hallucination_count = len(hallucination_logs)
+
+    # Write hallucination log if any detected
+    if hallucination_logs:
+        log_path = _write_hallucination_log(hallucination_logs)
+        console.print(
+            f"[yellow]{len(hallucination_logs)} potential hallucinations[/yellow] "
+            f"(see {log_path})"
+        )
+
+    # Summary
+    new_facts = len(verified_facts) - len(ctx.existing_facts)
+    console.print(
+        f"[green]✓ {new_facts} facts extracted[/green]"
+    )
+    show_phase_complete(console, elapsed)
+
     ctx.verified_facts = verified_facts
+    ctx.phase_timings["extract"] = elapsed
     return ctx
 
 
@@ -409,13 +475,23 @@ def phase_aggregate(ctx: PipelineContext) -> PipelineContext:
         >>> print(f"Aggregated to {len(ctx.aggregated_facts)} unique facts")
     """
     console = ctx.console
+    start_time = time.time()
+
+    show_phase_header(console, 4, "AGGREGATE")
 
     if ctx.verified_facts:
-        console.print("\n[bold]Aggregating facts...[/bold]")
         ctx.aggregated_facts = aggregate(ctx.verified_facts)
+        console.print(
+            f"[green]✓ {len(ctx.verified_facts)} facts → "
+            f"{len(ctx.aggregated_facts)} unique[/green]"
+        )
     else:
-        console.print("\n[yellow]No facts extracted.[/yellow]")
+        console.print("[yellow]No facts extracted.[/yellow]")
         ctx.aggregated_facts = []
+
+    elapsed = time.time() - start_time
+    ctx.phase_timings["aggregate"] = elapsed
+    show_phase_complete(console, elapsed)
 
     return ctx
 
@@ -442,6 +518,9 @@ def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
     """
     console = ctx.console
     checkpoint_path = get_checkpoint_path(ctx.input_file)
+    start_time = time.time()
+
+    show_phase_header(console, 5, "DEDUPLICATE")
 
     # Check if dedup already completed (resume support)
     existing_checkpoint = load_checkpoint(checkpoint_path)
@@ -452,27 +531,27 @@ def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
             for f in dedup_facts_data
         ]
         console.print(
-            f"\n[green]Dedup checkpoint found:[/green] "
-            f"{len(ctx.deduplicated_facts)} deduplicated facts loaded"
+            f"[green]Checkpoint found: {len(ctx.deduplicated_facts)} deduplicated facts loaded[/green]"
         )
+        show_phase_complete(console, time.time() - start_time)
         return ctx
 
     if not ctx.aggregated_facts:
-        console.print("\n[yellow]No facts to deduplicate.[/yellow]")
+        console.print("[yellow]No facts to deduplicate.[/yellow]")
         ctx.deduplicated_facts = []
+        show_phase_complete(console, time.time() - start_time)
         return ctx
 
     input_count = len(ctx.aggregated_facts)
 
     # Show category breakdown before dedup (engineering data)
     by_category = group_by_category(ctx.aggregated_facts)
-    console.print(f"\n[bold]Deduplicating {input_count} aggregated facts...[/bold]")
-    console.print("[dim]Category breakdown before dedup:[/dim]")
+    console.print(f"Deduplicating {input_count} facts...")
+    console.print("[dim]Category breakdown:[/dim]")
     for cat, facts in sorted(by_category.items(), key=lambda x: -len(x[1])):
         console.print(f"  [dim]{cat}: {len(facts)}[/dim]")
 
-    # Run deduplication with timing
-    start_time = time.time()
+    # Run deduplication
     try:
         ctx.deduplicated_facts = deduplicate(ctx.aggregated_facts, ctx.provider)
     except Exception as e:
@@ -484,10 +563,10 @@ def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
     output_count = len(ctx.deduplicated_facts)
     reduction_pct = ((input_count - output_count) / input_count * 100) if input_count > 0 else 0
 
-    # Engineering stats
+    # Summary
     console.print(
-        f"  [green]Reduced {input_count} → {output_count} facts "
-        f"({reduction_pct:.1f}% reduction)[/green] [{format_elapsed_time(elapsed)}]"
+        f"[green]✓ {input_count} → {output_count} facts "
+        f"({reduction_pct:.0f}% reduction)[/green]"
     )
 
     # Save checkpoint with dedup results
@@ -504,7 +583,9 @@ def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
             for f in ctx.deduplicated_facts
         ],
     })
-    console.print("[dim]Dedup checkpoint saved.[/dim]")
+
+    ctx.phase_timings["deduplicate"] = elapsed
+    show_phase_complete(console, elapsed)
 
     return ctx
 
@@ -535,6 +616,9 @@ def phase_distill(ctx: PipelineContext) -> PipelineContext:
     """
     console = ctx.console
     checkpoint_path = get_checkpoint_path(ctx.input_file)
+    start_time = time.time()
+
+    show_phase_header(console, 6, "DISTILL")
 
     # Check if distill already completed (resume support)
     existing_checkpoint = load_checkpoint(checkpoint_path)
@@ -542,24 +626,24 @@ def phase_distill(ctx: PipelineContext) -> PipelineContext:
         profile_data = existing_checkpoint.get("distilled_profile", {})
         ctx.distilled_profile = DistilledProfile(**profile_data)
         console.print(
-            f"\n[green]Distill checkpoint found:[/green] "
-            f"Profile for '{ctx.distilled_profile.name}' loaded"
+            f"[green]Checkpoint found: Profile for '{ctx.distilled_profile.name}' loaded[/green]"
         )
+        show_phase_complete(console, time.time() - start_time)
         return ctx
 
     if not ctx.deduplicated_facts:
-        console.print("\n[yellow]No facts to distill.[/yellow]")
+        console.print("[yellow]No facts to distill.[/yellow]")
         ctx.distilled_profile = None
+        show_phase_complete(console, time.time() - start_time)
         return ctx
 
     # Engineering data: input count
     input_count = len(ctx.deduplicated_facts)
     source_info = f"{ctx.export_type or 'Unknown'} export ({len(ctx.conversations)} conversations)"
 
-    console.print(f"\n[bold]Distilling {input_count} facts into memory profile...[/bold]")
+    console.print(f"Distilling {input_count} facts into memory profile...")
 
-    # Run distillation with timing
-    start_time = time.time()
+    # Run distillation
     try:
         ctx.distilled_profile = distill(
             facts=ctx.deduplicated_facts,
@@ -574,11 +658,11 @@ def phase_distill(ctx: PipelineContext) -> PipelineContext:
 
     elapsed = time.time() - start_time
 
-    # Engineering stats
+    # Summary
     output_count = sum(len(facts) for facts in ctx.distilled_profile.categories.values())
     console.print(
-        f"  [green]Profile generated for '{ctx.distilled_profile.name}'[/green] "
-        f"({output_count} organized facts) [{format_elapsed_time(elapsed)}]"
+        f"[green]✓ Profile '{ctx.distilled_profile.name}' generated "
+        f"({output_count} organized facts)[/green]"
     )
 
     # Save checkpoint with distill results
@@ -597,7 +681,9 @@ def phase_distill(ctx: PipelineContext) -> PipelineContext:
         "distill_completed": True,
         "distilled_profile": asdict(ctx.distilled_profile),
     })
-    console.print("[dim]Distill checkpoint saved.[/dim]")
+
+    ctx.phase_timings["distill"] = elapsed
+    show_phase_complete(console, elapsed)
 
     return ctx
 
@@ -619,21 +705,27 @@ def phase_output(ctx: PipelineContext) -> PipelineContext:
         >>> print(f"Output: {ctx.output_md_path}")
     """
     console = ctx.console
+    start_time = time.time()
+
+    show_phase_header(console, 7, "OUTPUT")
 
     if not ctx.distilled_profile:
-        console.print("\n[yellow]No profile to output.[/yellow]")
+        console.print("[yellow]No profile to output.[/yellow]")
+        show_phase_complete(console, time.time() - start_time)
         return ctx
 
     output_dir = Path.cwd() / "output"
     output_dir.mkdir(exist_ok=True)
 
-    console.print("\n[bold]Writing output files...[/bold]")
-
     # Write both formats
     ctx.output_md_path = write_markdown(ctx.distilled_profile, output_dir)
     ctx.output_json_path = write_json(ctx.distilled_profile, output_dir)
 
-    console.print(f"  [green]Markdown:[/green] {ctx.output_md_path}")
-    console.print(f"  [green]JSON:[/green] {ctx.output_json_path}")
+    console.print(f"[green]✓ Markdown:[/green] {ctx.output_md_path}")
+    console.print(f"[green]✓ JSON:[/green] {ctx.output_json_path}")
+
+    elapsed = time.time() - start_time
+    ctx.phase_timings["output"] = elapsed
+    show_phase_complete(console, elapsed)
 
     return ctx

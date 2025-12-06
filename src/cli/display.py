@@ -405,3 +405,101 @@ def show_final_results(
             console.print(f"  [cyan]{cat.title()}:[/cyan]")
             for f in facts:
                 console.print(f"    - {f[:60]}{'...' if len(f) > 60 else ''}")
+
+
+def show_phase_header(console: Console, phase_num: int, name: str) -> None:
+    """Display phase header with horizontal rule.
+
+    Creates a clear visual separator between pipeline phases with
+    consistent formatting.
+
+    Args:
+        console: Rich console instance for output.
+        phase_num: Phase number (1-based).
+        name: Name of the phase (e.g., "PARSE", "EXTRACTION").
+
+    Example:
+        >>> console = Console()
+        >>> show_phase_header(console, 1, "PARSE")
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         PHASE 1: PARSE
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    """
+    console.print(f"\n{'━' * 60}")
+    console.print(f" [bold]PHASE {phase_num}: {name}[/bold]")
+    console.print('━' * 60)
+
+
+def show_phase_complete(console: Console, elapsed: float) -> None:
+    """Display phase completion with elapsed time.
+
+    Args:
+        console: Rich console instance for output.
+        elapsed: Elapsed time in seconds.
+
+    Example:
+        >>> show_phase_complete(console, 125.3)
+        Phase complete [2m 5s]
+    """
+    console.print(f"[dim]Phase complete [{format_elapsed_time(elapsed)}][/dim]")
+
+
+def show_pipeline_summary(
+    console: Console,
+    stats,
+    verified_count: int,
+    hallucination_count: int,
+    dedup_count: int,
+    input_count: int,
+    total_elapsed: float,
+    output_path: Optional[Path] = None,
+) -> None:
+    """Display final pipeline summary with key statistics.
+
+    Shows a comprehensive summary of the pipeline run including input stats,
+    extraction results, deduplication ratio, and total time.
+
+    Args:
+        console: Rich console instance for output.
+        stats: ConversationStats object with input statistics.
+        verified_count: Number of facts extracted and verified.
+        hallucination_count: Number of potential hallucinations detected.
+        dedup_count: Number of facts after deduplication.
+        input_count: Number of facts before deduplication.
+        total_elapsed: Total pipeline elapsed time in seconds.
+        output_path: Path to the output file (if any).
+
+    Example:
+        >>> show_pipeline_summary(console, stats, 321, 14, 180, 312, 503.2, Path("output/memory-profile.md"))
+    """
+    console.print(f"\n{'━' * 60}")
+    console.print(" [bold]SUMMARY[/bold]")
+    console.print('━' * 60)
+
+    # Input stats
+    if stats:
+        console.print(
+            f"Input:        {stats.total_conversations} conversations "
+            f"({stats.total_chars:,} chars)"
+        )
+
+    # Extraction results
+    if verified_count > 0:
+        hallu_note = ""
+        if hallucination_count > 0:
+            hallu_note = f" ({hallucination_count} potential hallucinations)"
+        console.print(f"Extracted:    {verified_count} facts{hallu_note}")
+
+    # Dedup results
+    if dedup_count > 0 and input_count > 0:
+        reduction = ((input_count - dedup_count) / input_count) * 100
+        console.print(
+            f"Deduplicated: {dedup_count} final facts ({reduction:.0f}% reduction)"
+        )
+
+    # Total time
+    console.print(f"Total time:   {format_elapsed_time(total_elapsed)}")
+
+    # Output path
+    if output_path:
+        console.print(f"\nOutput: {output_path}")
