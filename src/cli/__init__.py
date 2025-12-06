@@ -35,6 +35,9 @@ from src.cli.display import (
     show_results,
     show_dedup_results,
     show_final_results,
+    show_phase_header,
+    show_phase_complete,
+    show_pipeline_summary,
 )
 
 # Validation
@@ -94,6 +97,9 @@ __all__ = [
     "show_results",
     "show_dedup_results",
     "show_final_results",
+    "show_phase_header",
+    "show_phase_complete",
+    "show_pipeline_summary",
     # Validation
     "DEFAULT_INPUT_PATH",
     "SUPPORTED_EXPORTS",

@@ -178,7 +178,7 @@ class TestVerifyAll:
     """Test verify_all for batch verification."""
 
     def test_separates_verified_and_discarded(self):
-        """Should return two lists: verified and discarded facts."""
+        """Should return three lists: verified, discarded, and hallucination logs."""
         from src.verifier import verify_all
 
         facts = [
@@ -190,11 +190,12 @@ class TestVerifyAll:
             "conv-1": "I live in Seattle and love my job"
         }
 
-        verified, discarded = verify_all(facts, conversations)
+        verified, discarded, hallucination_logs = verify_all(facts, conversations)
 
         assert len(verified) == 2
         assert len(discarded) == 1
         assert discarded[0]["fact"] == "Fact 2"
+        assert len(hallucination_logs) == 1  # One hallucination log entry
 
     def test_handles_multiple_conversations(self):
         """Should look up correct conversation for each fact."""
@@ -209,10 +210,11 @@ class TestVerifyAll:
             "conv-2": "I visited Portland",
         }
 
-        verified, discarded = verify_all(facts, conversations)
+        verified, discarded, hallucination_logs = verify_all(facts, conversations)
 
         assert len(verified) == 2
         assert len(discarded) == 0
+        assert len(hallucination_logs) == 0
 
     def test_missing_conversation_fails_verification(self):
         """Fact referencing non-existent conversation should fail."""
@@ -225,19 +227,21 @@ class TestVerifyAll:
             "conv-1": "I live in Seattle",
         }
 
-        verified, discarded = verify_all(facts, conversations)
+        verified, discarded, hallucination_logs = verify_all(facts, conversations)
 
         assert len(verified) == 0
         assert len(discarded) == 1
+        assert len(hallucination_logs) == 1
 
     def test_empty_facts_list(self):
         """Empty facts list should return empty lists."""
         from src.verifier import verify_all
 
-        verified, discarded = verify_all([], {"conv-1": "text"})
+        verified, discarded, hallucination_logs = verify_all([], {"conv-1": "text"})
 
         assert verified == []
         assert discarded == []
+        assert hallucination_logs == []
 
     def test_returns_original_fact_objects(self):
         """Verified/discarded lists should contain original fact dicts."""
@@ -247,6 +251,6 @@ class TestVerifyAll:
         facts = [original_fact]
         conversations = {"conv-1": "hello world"}
 
-        verified, discarded = verify_all(facts, conversations)
+        verified, discarded, _ = verify_all(facts, conversations)
 
         assert verified[0] is original_fact  # Same object reference
