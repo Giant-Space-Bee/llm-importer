@@ -362,6 +362,19 @@ class APIProvider(LLMProvider):
                 response.usage.output_tokens
             )
 
+            # Check stop_reason BEFORE parsing - these bypass schema guarantees
+            if response.stop_reason == "refusal":
+                raise RuntimeError(
+                    "Claude refused request for safety reasons. "
+                    "Check extraction prompt for policy violations."
+                )
+
+            if response.stop_reason == "max_tokens":
+                raise RuntimeError(
+                    f"Response truncated at {DEFAULT_MAX_TOKENS} tokens. "
+                    "JSON is incomplete. Reduce input size or increase max_tokens."
+                )
+
             # Validate response content
             if not response.content:
                 raise RuntimeError("Claude API returned empty content array")
@@ -376,12 +389,9 @@ class APIProvider(LLMProvider):
 
             content = content_block.text
 
-            # Debug logging for malformed responses
-            if not content or not content.strip().startswith("{"):
-                print(
-                    f"[DEBUG] Unexpected API response: {content[:200]!r}",
-                    file=sys.stderr,
-                )
+            # Final validation before parsing
+            if not content or not content.strip():
+                raise RuntimeError("Claude returned empty text content")
 
             return json.loads(content)
 

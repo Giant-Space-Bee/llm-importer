@@ -320,6 +320,57 @@ class TestAPIProviderErrorHandling:
             with pytest.raises(RuntimeError, match="JSON"):
                 provider.complete_structured("Test", {"type": "object"})
 
+    @patch("anthropic.Anthropic")
+    def test_handles_refusal_stop_reason(self, mock_anthropic_class):
+        """Should raise RuntimeError when Claude refuses for safety reasons."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.stop_reason = "refusal"
+        mock_response.content = [MagicMock(text="I can't help with that.")]
+        mock_response.usage.input_tokens = 10
+        mock_response.usage.output_tokens = 5
+        mock_client.beta.messages.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            with pytest.raises(RuntimeError, match="refused"):
+                provider.complete_structured("Test", {"type": "object"})
+
+    @patch("anthropic.Anthropic")
+    def test_handles_max_tokens_stop_reason(self, mock_anthropic_class):
+        """Should raise RuntimeError when response is truncated at token limit."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.stop_reason = "max_tokens"
+        mock_response.content = [MagicMock(text='{"facts": [{"incomplete":')]
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 8192
+        mock_client.beta.messages.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            with pytest.raises(RuntimeError, match="truncated"):
+                provider.complete_structured("Test", {"type": "object"})
+
+    @patch("anthropic.Anthropic")
+    def test_handles_empty_content(self, mock_anthropic_class):
+        """Should raise RuntimeError when response content is empty."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.stop_reason = "end_turn"
+        mock_response.content = []
+        mock_response.usage.input_tokens = 10
+        mock_response.usage.output_tokens = 0
+        mock_client.beta.messages.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = APIProvider()
+            with pytest.raises(RuntimeError, match="empty"):
+                provider.complete_structured("Test", {"type": "object"})
+
 
 class TestAPIProviderQualityFirstChunking:
     """Quality-first chunking: 8k chunks for better extraction, parallelism fills TPM budget."""
