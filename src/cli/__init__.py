@@ -34,6 +34,7 @@ from src.cli.display import (
     show_chunk_table,
     show_results,
     show_dedup_results,
+    show_final_results,
 )
 
 # Validation
@@ -71,6 +72,8 @@ from src.cli.phases import (
     phase_extract,
     phase_aggregate,
     phase_deduplicate,
+    phase_distill,
+    phase_output,
     process_sequential_with_checkpoints,
 )
 
@@ -90,6 +93,7 @@ __all__ = [
     "show_chunk_table",
     "show_results",
     "show_dedup_results",
+    "show_final_results",
     # Validation
     "DEFAULT_INPUT_PATH",
     "SUPPORTED_EXPORTS",
@@ -115,5 +119,7 @@ __all__ = [
     "phase_extract",
     "phase_aggregate",
     "phase_deduplicate",
+    "phase_distill",
+    "phase_output",
     "process_sequential_with_checkpoints",
 ]

@@ -9,6 +9,8 @@ This module contains dataclasses used throughout the CLI:
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from pathlib import Path
+
 from src.parser import (
     Conversation,
     UserProfile,
@@ -21,6 +23,7 @@ from src.providers import LLMProvider
 from src.extractor import ExtractedFact
 from src.aggregator import AggregatedFact
 from src.deduplicator import DeduplicatedFact
+from src.distiller import DistilledProfile
 
 
 @dataclass
@@ -56,6 +59,9 @@ class PipelineContext:
     4. phase_check_resume: remaining_indices, existing_facts
     5. phase_extract: verified_facts
     6. phase_aggregate: aggregated_facts
+    7. phase_deduplicate: deduplicated_facts
+    8. phase_distill: distilled_profile
+    9. phase_output: output_md_path, output_json_path
 
     Attributes:
         input_file: Path to the input JSON file.
@@ -114,3 +120,6 @@ class PipelineContext:
     verified_facts: List[ExtractedFact] = field(default_factory=list)
     aggregated_facts: List[AggregatedFact] = field(default_factory=list)
     deduplicated_facts: List[DeduplicatedFact] = field(default_factory=list)
+    distilled_profile: Optional[DistilledProfile] = None
+    output_md_path: Optional[Path] = None
+    output_json_path: Optional[Path] = None

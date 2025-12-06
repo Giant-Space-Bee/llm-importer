@@ -7,6 +7,7 @@ the updated context. This enables clean phase-based orchestration in main().
 
 import time
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Dict, List
 
 from src.parser import (
@@ -24,6 +25,7 @@ from src.extractor import ExtractedFact
 from src.processor import extract_and_verify_chunk, process_all_chunks, ParallelResult
 from src.aggregator import aggregate, AggregatedFact, group_by_category
 from src.deduplicator import deduplicate, DeduplicatedFact
+from src.distiller import distill, DistilledProfile, write_markdown, write_json
 from src.checkpoint import hash_file, save_checkpoint, get_remaining_chunks, load_checkpoint
 
 from src.cli.types import PipelineContext
@@ -503,5 +505,135 @@ def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
         ],
     })
     console.print("[dim]Dedup checkpoint saved.[/dim]")
+
+    return ctx
+
+
+def phase_distill(ctx: PipelineContext) -> PipelineContext:
+    """Compress deduplicated facts into final memory profile.
+
+    Uses LLM to synthesize facts into a coherent, categorized profile.
+    If trusted_context is available (Claude memories or ChatGPT custom
+    instructions), merges with existing profile rather than creating
+    from scratch.
+
+    Includes checkpoint support: if distill_completed is True in checkpoint,
+    loads the saved profile instead of re-running the LLM.
+
+    Args:
+        ctx: Pipeline context with deduplicated_facts and provider.
+
+    Returns:
+        Updated context with distilled_profile.
+
+    Raises:
+        Exception: If LLM call fails.
+
+    Example:
+        >>> ctx = phase_distill(ctx)
+        >>> print(f"Profile for '{ctx.distilled_profile.name}'")
+    """
+    console = ctx.console
+    checkpoint_path = get_checkpoint_path(ctx.input_file)
+
+    # Check if distill already completed (resume support)
+    existing_checkpoint = load_checkpoint(checkpoint_path)
+    if existing_checkpoint and existing_checkpoint.get("distill_completed"):
+        profile_data = existing_checkpoint.get("distilled_profile", {})
+        ctx.distilled_profile = DistilledProfile(**profile_data)
+        console.print(
+            f"\n[green]Distill checkpoint found:[/green] "
+            f"Profile for '{ctx.distilled_profile.name}' loaded"
+        )
+        return ctx
+
+    if not ctx.deduplicated_facts:
+        console.print("\n[yellow]No facts to distill.[/yellow]")
+        ctx.distilled_profile = None
+        return ctx
+
+    # Engineering data: input count
+    input_count = len(ctx.deduplicated_facts)
+    source_info = f"{ctx.export_type or 'Unknown'} export ({len(ctx.conversations)} conversations)"
+
+    console.print(f"\n[bold]Distilling {input_count} facts into memory profile...[/bold]")
+
+    # Run distillation with timing
+    start_time = time.time()
+    try:
+        ctx.distilled_profile = distill(
+            facts=ctx.deduplicated_facts,
+            provider=ctx.provider,
+            trusted_context=ctx.trusted_context,
+            source_info=source_info,
+        )
+    except Exception as e:
+        console.print(f"\n[red]Distill error:[/red] {e}")
+        console.print("[yellow]Deduplicated facts preserved in checkpoint for retry.[/yellow]")
+        raise
+
+    elapsed = time.time() - start_time
+
+    # Engineering stats
+    output_count = sum(len(facts) for facts in ctx.distilled_profile.categories.values())
+    console.print(
+        f"  [green]Profile generated for '{ctx.distilled_profile.name}'[/green] "
+        f"({output_count} organized facts) [{format_elapsed_time(elapsed)}]"
+    )
+
+    # Save checkpoint with distill results
+    save_checkpoint(checkpoint_path, {
+        "source_file_hash": hash_file(ctx.input_file),
+        "completed_chunks": list(range(len(ctx.chunks))),
+        "verified_facts": [
+            asdict(f) if isinstance(f, ExtractedFact) else f
+            for f in ctx.verified_facts
+        ],
+        "dedup_completed": True,
+        "deduplicated_facts": [
+            asdict(f) if isinstance(f, DeduplicatedFact) else f
+            for f in ctx.deduplicated_facts
+        ],
+        "distill_completed": True,
+        "distilled_profile": asdict(ctx.distilled_profile),
+    })
+    console.print("[dim]Distill checkpoint saved.[/dim]")
+
+    return ctx
+
+
+def phase_output(ctx: PipelineContext) -> PipelineContext:
+    """Write distilled profile to output files.
+
+    Creates both markdown (human-readable) and JSON (machine-importable)
+    versions of the memory profile in the output/ directory.
+
+    Args:
+        ctx: Pipeline context with distilled_profile.
+
+    Returns:
+        Updated context with output_md_path and output_json_path.
+
+    Example:
+        >>> ctx = phase_output(ctx)
+        >>> print(f"Output: {ctx.output_md_path}")
+    """
+    console = ctx.console
+
+    if not ctx.distilled_profile:
+        console.print("\n[yellow]No profile to output.[/yellow]")
+        return ctx
+
+    output_dir = Path.cwd() / "output"
+    output_dir.mkdir(exist_ok=True)
+
+    console.print("\n[bold]Writing output files...[/bold]")
+
+    # Write both formats
+    ctx.output_md_path = write_markdown(ctx.distilled_profile, output_dir)
+    ctx.output_json_path = write_json(ctx.distilled_profile, output_dir)
+
+    console.print(f"  [green]Markdown:[/green] {ctx.output_md_path}")
+    console.print(f"  [green]JSON:[/green] {ctx.output_json_path}")
 
     return ctx

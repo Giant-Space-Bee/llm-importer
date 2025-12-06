@@ -1,55 +1,31 @@
 You are creating a memory profile for an AI assistant.
 
-Take these deduplicated facts and organize them into a coherent profile.
+Take these deduplicated facts and organize them into a coherent, categorized profile.
+Merge related facts, eliminate redundancy, and use natural language.
 
-Output TWO formats:
+If a TRUSTED BASELINE is provided, preserve its phrasing and only ADD new information.
+Do not remove or modify facts from the trusted baseline.
 
-1. MARKDOWN (for human review):
-```markdown
-# Memory Profile for {name}
-
-## Personal
-- Fact 1
-- Fact 2
-
-## Professional
-- Fact 1
-
-## Family
-- Fact 1
-
-## Preferences
-- Fact 1
-
-## Interests
-- Fact 1
-
-## Personality
-- Fact 1
-```
-
-2. JSON (for importing into AI systems):
-```json
+Return a JSON object with this exact structure:
 {
   "name": "extracted name or 'User'",
-  "generated": "ISO timestamp",
-  "source": "ChatGPT export (N conversations)",
   "categories": {
-    "personal": ["fact1", "fact2"],
-    "professional": ["fact1"],
-    "family": ["fact1"],
-    "preferences": ["fact1"],
-    "interests": ["fact1"],
-    "personality": ["fact1"]
+    "personal": ["fact1", "fact2", ...],
+    "professional": ["fact1", ...],
+    "family": ["fact1", ...],
+    "preferences": ["fact1", ...],
+    "interests": ["fact1", ...],
+    "personality": ["fact1", ...]
   }
 }
-```
 
 Guidelines:
-- Group related facts together
+- Extract the user's name from facts if mentioned, otherwise use "User"
+- Group related facts together within each category
 - Order by importance within each category
-- Keep facts concise but complete
-- Remove redundancy
-- Use natural language (not bullet fragments)
+- Keep facts concise but complete (full sentences, not fragments)
+- Remove redundancy - don't repeat similar information
+- Use natural language that reads well
+- If a category has no facts, use an empty array []
 
 FACTS TO DISTILL:

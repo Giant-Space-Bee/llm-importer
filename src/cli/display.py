@@ -6,6 +6,7 @@ and result summaries using the Rich library.
 """
 
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from rich.console import Console
@@ -16,6 +17,7 @@ from src.parser import ConversationStats, UserProfile, ClaudeMemories
 from src.chunker import Chunk
 from src.aggregator import AggregatedFact, group_by_category
 from src.deduplicator import DeduplicatedFact
+from src.distiller import DistilledProfile
 
 
 def get_banner() -> str:
@@ -350,3 +352,56 @@ def show_dedup_results(
                     # Truncate long facts for display
                     display_fact = f.fact[:80] + "..." if len(f.fact) > 80 else f.fact
                     console.print(f"    - {display_fact}")
+
+
+def show_final_results(
+    console: Console,
+    profile: DistilledProfile,
+    md_path: Path,
+    json_path: Path,
+) -> None:
+    """Display final results summary with profile preview.
+
+    Shows a summary table of facts by category, lists output file paths,
+    and previews the first few facts from select categories.
+
+    Args:
+        console: Rich console instance for output.
+        profile: The distilled profile to display.
+        md_path: Path to the written markdown file.
+        json_path: Path to the written JSON file.
+
+    Example:
+        >>> console = Console()
+        >>> show_final_results(console, profile, md_path, json_path)
+    """
+    categories = ["personal", "professional", "family", "preferences", "interests", "personality"]
+
+    # Category summary table
+    table = Table(title=f"Memory Profile: {profile.name}", show_header=True)
+    table.add_column("Category", style="cyan")
+    table.add_column("Facts", style="green", justify="right")
+
+    total = 0
+    for cat in categories:
+        count = len(profile.categories.get(cat, []))
+        total += count
+        if count > 0:
+            table.add_row(cat.title(), str(count))
+
+    table.add_row("[bold]TOTAL[/bold]", f"[bold]{total}[/bold]")
+    console.print(table)
+
+    # Output files
+    console.print(f"\n[bold]Output Files:[/bold]")
+    console.print(f"  {md_path}")
+    console.print(f"  {json_path}")
+
+    # Preview first few facts from each category
+    console.print(f"\n[bold]Preview:[/bold]")
+    for cat in ["personal", "professional"]:
+        facts = profile.categories.get(cat, [])[:2]
+        if facts:
+            console.print(f"  [cyan]{cat.title()}:[/cyan]")
+            for f in facts:
+                console.print(f"    - {f[:60]}{'...' if len(f) > 60 else ''}")

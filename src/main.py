@@ -33,6 +33,7 @@ from src.cli import (
     get_coming_soon_message,
     show_results,
     show_dedup_results,
+    show_final_results,
     # Validation
     DEFAULT_INPUT_PATH,
     SUPPORTED_EXPORTS,
@@ -57,6 +58,8 @@ from src.cli import (
     phase_extract,
     phase_aggregate,
     phase_deduplicate,
+    phase_distill,
+    phase_output,
     process_sequential_with_checkpoints,
 )
 
@@ -153,6 +156,8 @@ def main() -> int:
         ctx = phase_extract(ctx)
         ctx = phase_aggregate(ctx)
         ctx = phase_deduplicate(ctx)
+        ctx = phase_distill(ctx)
+        ctx = phase_output(ctx)
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted. Progress saved to checkpoint.[/yellow]")
         return 1
@@ -163,8 +168,13 @@ def main() -> int:
         return 1
 
     # Show results
-    if ctx.deduplicated_facts:
-        show_dedup_results(console, ctx.deduplicated_facts, len(ctx.aggregated_facts))
+    if ctx.distilled_profile and ctx.output_md_path:
+        show_final_results(
+            console,
+            ctx.distilled_profile,
+            ctx.output_md_path,
+            ctx.output_json_path,
+        )
 
     console.print("\n[green]Done![/green]")
     return 0
