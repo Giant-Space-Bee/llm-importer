@@ -686,3 +686,122 @@ class TestFormatUserProfileForDistiller:
 
         # Should be empty or minimal
         assert formatted == ""
+
+
+# --- Duplicate conversation ID validation tests ---
+
+from unittest.mock import MagicMock
+from src.cli.phases import phase_parse
+from src.cli.types import PipelineContext
+
+
+class TestDuplicateIdValidation:
+    """Tests for duplicate conversation ID detection in phase_parse."""
+
+    def test_duplicate_chatgpt_ids_raises(self, tmp_path):
+        """Should raise ValueError for duplicate ChatGPT conversation IDs."""
+        # Create file with duplicate 'id' fields
+        dup_file = tmp_path / "dup_chatgpt.json"
+        dup_file.write_text(json.dumps([
+            {"id": "convo-1", "title": "First", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+            {"id": "convo-1", "title": "Duplicate", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+        ]))
+
+        ctx = PipelineContext(input_file=str(dup_file), console=MagicMock())
+
+        with pytest.raises(ValueError, match="Duplicate conversation IDs"):
+            phase_parse(ctx)
+
+    def test_duplicate_claude_ids_raises(self, tmp_path):
+        """Should raise ValueError for duplicate Claude conversation IDs."""
+        # Create file with duplicate 'uuid' fields
+        dup_file = tmp_path / "dup_claude.json"
+        dup_file.write_text(json.dumps([
+            {"uuid": "convo-1", "name": "First", "created_at": "2025-01-01T00:00:00Z", "chat_messages": []},
+            {"uuid": "convo-1", "name": "Duplicate", "created_at": "2025-01-01T00:00:00Z", "chat_messages": []},
+        ]))
+
+        ctx = PipelineContext(input_file=str(dup_file), console=MagicMock())
+
+        with pytest.raises(ValueError, match="Duplicate conversation IDs"):
+            phase_parse(ctx)
+
+    def test_unique_ids_pass(self, chatgpt_fixture):
+        """Should not raise for unique conversation IDs."""
+        ctx = PipelineContext(input_file=str(chatgpt_fixture), console=MagicMock())
+
+        # Should not raise
+        result = phase_parse(ctx)
+        assert result.conversations is not None
+
+    def test_error_message_includes_ids(self, tmp_path):
+        """Error message should list the duplicate IDs."""
+        dup_file = tmp_path / "dup_ids.json"
+        dup_file.write_text(json.dumps([
+            {"id": "dup-id-123", "title": "First", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+            {"id": "dup-id-123", "title": "Second", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+        ]))
+
+        ctx = PipelineContext(input_file=str(dup_file), console=MagicMock())
+
+        with pytest.raises(ValueError) as exc_info:
+            phase_parse(ctx)
+
+        assert "dup-id-123" in str(exc_info.value)
+        assert "corrupted export" in str(exc_info.value).lower()
+
+    def test_many_duplicates_truncated(self, tmp_path):
+        """Should truncate to first 5 duplicate IDs when >5 exist."""
+        # Create file with 7 different duplicate IDs
+        convos = []
+        for i in range(7):
+            # Each ID appears twice
+            convos.append({"id": f"dup-{i}", "title": "First", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}})
+            convos.append({"id": f"dup-{i}", "title": "Second", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}})
+
+        dup_file = tmp_path / "many_dups.json"
+        dup_file.write_text(json.dumps(convos))
+
+        ctx = PipelineContext(input_file=str(dup_file), console=MagicMock())
+
+        with pytest.raises(ValueError) as exc_info:
+            phase_parse(ctx)
+
+        error_msg = str(exc_info.value)
+        # Should show 5 IDs and indicate 2 more
+        assert "(and 2 more)" in error_msg
+        # Should only show first 5 (sorted: dup-0 through dup-4)
+        assert "dup-0" in error_msg
+        assert "dup-4" in error_msg
+
+    def test_triple_duplicate_shown_once(self, tmp_path):
+        """Same ID appearing 3+ times should only be listed once in error."""
+        dup_file = tmp_path / "triple_dup.json"
+        dup_file.write_text(json.dumps([
+            {"id": "same-id", "title": "First", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+            {"id": "same-id", "title": "Second", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+            {"id": "same-id", "title": "Third", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+        ]))
+
+        ctx = PipelineContext(input_file=str(dup_file), console=MagicMock())
+
+        with pytest.raises(ValueError) as exc_info:
+            phase_parse(ctx)
+
+        error_msg = str(exc_info.value)
+        # Should appear exactly once in the list, not twice
+        assert error_msg.count("same-id") == 1
+
+    def test_missing_id_field_detected(self, tmp_path):
+        """Conversations missing ID field should be caught as duplicates."""
+        dup_file = tmp_path / "missing_ids.json"
+        dup_file.write_text(json.dumps([
+            {"id": "valid-id", "title": "Valid", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+            {"title": "Missing ID 1", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+            {"title": "Missing ID 2", "mapping": {"root": {"id": "root", "message": None, "parent": None, "children": []}}},
+        ]))
+
+        ctx = PipelineContext(input_file=str(dup_file), console=MagicMock())
+
+        with pytest.raises(ValueError, match="Duplicate conversation IDs"):
+            phase_parse(ctx)
