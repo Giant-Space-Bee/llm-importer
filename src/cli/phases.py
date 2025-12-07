@@ -84,6 +84,26 @@ def phase_parse(ctx: PipelineContext) -> PipelineContext:
 
     # Build lookup using correct ID field (ChatGPT uses 'id', Claude uses 'uuid')
     id_field = "uuid" if export_type == "claude" else "id"
+
+    # Check for duplicate conversation IDs (would cause silent data loss)
+    seen_ids: set[str] = set()
+    duplicate_ids: set[str] = set()
+    for c in raw_convos:
+        cid = c.get(id_field) or ""
+        if cid in seen_ids:
+            duplicate_ids.add(cid)
+        seen_ids.add(cid)
+
+    if duplicate_ids:
+        dup_list = sorted(duplicate_ids)  # Deterministic order for testing
+        shown = dup_list[:5]
+        remaining = len(dup_list) - 5
+        raise ValueError(
+            f"Duplicate conversation IDs found: {shown}"
+            + (f" (and {remaining} more)" if remaining > 0 else "")
+            + "\nThis may indicate a corrupted export file."
+        )
+
     conversations_by_id = {c[id_field]: c for c in raw_convos}
 
     # Show stats
