@@ -361,10 +361,19 @@ class TestParseIsoTimestamp:
         ts = _parse_iso_timestamp("2025-12-01T06:01:43.108834+00:00")
         assert ts > 0
 
-    def test_returns_zero_for_invalid(self):
-        """Should return 0 for invalid strings."""
-        assert _parse_iso_timestamp("not a date") == 0.0
-        assert _parse_iso_timestamp("") == 0.0
+    def test_returns_current_time_for_invalid(self):
+        """Should return current time for invalid strings (not 0.0 which breaks dedup)."""
+        import time
+        now = time.time()
+
+        ts_invalid = _parse_iso_timestamp("not a date")
+        ts_empty = _parse_iso_timestamp("")
+
+        # Should be recent (within 5 seconds of now), not 0.0
+        assert ts_invalid > now - 5
+        assert ts_invalid < now + 5
+        assert ts_empty > now - 5
+        assert ts_empty < now + 5
 
 
 class TestParseClaudeMessage:

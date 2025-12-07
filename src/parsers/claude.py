@@ -7,6 +7,7 @@ Handles Claude conversations.json format:
 - sender: "human" / "assistant"
 """
 
+import sys
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -22,7 +23,8 @@ def parse_iso_timestamp(iso_str: str) -> float:
         dt = datetime.fromisoformat(iso_str)
         return dt.timestamp()
     except (ValueError, AttributeError):
-        return 0.0
+        print(f"[warning] Malformed timestamp '{iso_str}', using current time", file=sys.stderr)
+        return datetime.now().timestamp()
 
 
 def parse_claude_message(msg_data: Dict[str, Any]) -> Optional[Message]:
