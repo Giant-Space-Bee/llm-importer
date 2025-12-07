@@ -375,6 +375,14 @@ class TestParseIsoTimestamp:
         assert ts_empty > now - 5
         assert ts_empty < now + 5
 
+    def test_uses_fallback_timestamp_when_provided(self):
+        """Should use fallback_timestamp instead of current time when provided."""
+        fallback = 1700000000.0  # Fixed timestamp: Nov 14, 2023
+
+        ts = _parse_iso_timestamp("not a date", fallback_timestamp=fallback)
+
+        assert ts == fallback
+
 
 class TestParseClaudeMessage:
     """_parse_claude_message() converts Claude message dicts to Message objects."""
@@ -454,6 +462,21 @@ class TestParseClaudeConversation:
         convo = parse_claude_conversation(convo_data)
 
         assert convo.title == "Untitled"
+
+    def test_message_uses_conversation_timestamp_as_fallback(self):
+        """Message with malformed timestamp should use conversation's timestamp."""
+        convo_data = {
+            "uuid": "convo-1",
+            "name": "Test",
+            "created_at": "2025-12-01T06:00:00Z",  # Valid conversation timestamp
+            "chat_messages": [
+                {"uuid": "msg-1", "sender": "human", "content": [{"text": "Hi"}], "created_at": ""},  # Invalid!
+            ]
+        }
+        convo = parse_claude_conversation(convo_data)
+
+        # Message should have conversation's timestamp, not 0.0 or current time
+        assert convo.messages[0].timestamp == convo.create_time
 
 
 class TestParseAllUnified:

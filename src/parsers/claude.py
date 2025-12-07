@@ -14,8 +14,13 @@ from typing import List, Dict, Any, Optional
 from src.parsers.types import Message, Conversation
 
 
-def parse_iso_timestamp(iso_str: str) -> float:
-    """Convert ISO timestamp string to Unix timestamp."""
+def parse_iso_timestamp(iso_str: str, fallback_timestamp: float | None = None) -> float:
+    """Convert ISO timestamp string to Unix timestamp.
+
+    Args:
+        iso_str: ISO 8601 timestamp string
+        fallback_timestamp: If provided, use this on parse failure instead of current time
+    """
     try:
         # Handle ISO format with microseconds and Z suffix
         if iso_str.endswith("Z"):
@@ -23,11 +28,14 @@ def parse_iso_timestamp(iso_str: str) -> float:
         dt = datetime.fromisoformat(iso_str)
         return dt.timestamp()
     except (ValueError, AttributeError):
+        if fallback_timestamp is not None:
+            print(f"[warning] Malformed timestamp '{iso_str}', using conversation time", file=sys.stderr)
+            return fallback_timestamp
         print(f"[warning] Malformed timestamp '{iso_str}', using current time", file=sys.stderr)
         return datetime.now().timestamp()
 
 
-def parse_claude_message(msg_data: Dict[str, Any]) -> Optional[Message]:
+def parse_claude_message(msg_data: Dict[str, Any], fallback_timestamp: float | None = None) -> Optional[Message]:
     """Parse a Claude message dict into a Message object."""
     if msg_data is None:
         return None
@@ -49,8 +57,8 @@ def parse_claude_message(msg_data: Dict[str, Any]) -> Optional[Message]:
     if not content:
         content = msg_data.get("text", "")
 
-    # Parse ISO timestamp
-    timestamp = parse_iso_timestamp(msg_data.get("created_at", ""))
+    # Parse ISO timestamp (fall back to conversation time if malformed)
+    timestamp = parse_iso_timestamp(msg_data.get("created_at", ""), fallback_timestamp)
 
     return Message(
         id=msg_data.get("uuid", ""),
@@ -63,14 +71,14 @@ def parse_claude_message(msg_data: Dict[str, Any]) -> Optional[Message]:
 
 def parse_claude_conversation(convo_data: Dict[str, Any]) -> Conversation:
     """Parse a single Claude conversation into our Conversation format."""
+    # Parse conversation timestamp first (used as fallback for malformed message timestamps)
+    create_time = parse_iso_timestamp(convo_data.get("created_at", ""))
+
     messages = []
     for msg_data in convo_data.get("chat_messages", []):
-        msg = parse_claude_message(msg_data)
+        msg = parse_claude_message(msg_data, fallback_timestamp=create_time)
         if msg is not None:
             messages.append(msg)
-
-    # Parse create_time from ISO format
-    create_time = parse_iso_timestamp(convo_data.get("created_at", ""))
 
     return Conversation(
         id=convo_data.get("uuid", ""),
