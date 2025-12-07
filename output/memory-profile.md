@@ -1,0 +1,118 @@
+# Memory Profile for Landon Brown
+
+> Generated: 2025-12-06T12:29:05.038118
+> Source: claude export (30 conversations)
+
+## Personal
+
+- Lives in Victoria, BC on Davin Street in a house purchased at age 20 for $480k, now worth approximately $1M
+- Has approximately $120k in savings ($93,140.47 in savings account, $71,694.58 in RRSPs, plus additional funds)
+- Owns a 2024 Ford Maverick Lariat Hybrid AWD with 4k towing package purchased for $60k at 5.99% over 3 years with $6k down, paying $833.78 biweekly, achieving 5.9L/100km highway and sometimes 3.6-3.9L/100km city when hypermiling
+- Owns a 2015 Nissan Leaf SL nicknamed 'Eevee' (paid off) used as daily driver
+- Pays $1,639.65 per month for mortgage to MCAP/RMG and $132.64 biweekly for TD Loan for trailer
+- Graduated high school in Prince George and moved to Victoria after running away from parents
+- Lived as a nomad in an RV for 6 months travelling the US with best friend and girlfriend Sara 2, has had 7 long-term relationships including two women named Sara
+- Has a 2-level starter home approximately 1,800 square feet with 950 square foot basement, including a 237 square foot office (25% of basement)
+- Has a gaming PC with RTX 4090 GPU, AMD Ryzen 9800X3D CPU, 64GB DDR5 RAM, plus MacBook Pro M3 Max with 128GB RAM retained from EvolveWell
+- Recently paid off all credit cards and line of credit, receiving $12,838.02 into bank account plus $5,345.96 currently in account
+- Has modern Samsung ducted heat pump furnace installed last year with thermostat upstairs controlling entire house (no zone control), insulation and double-paned windows
+- Signed up for BC Hydro time-of-day pricing (Haley is skeptical), used 911 kWh Sept 18-Oct 17 with 245 kWh in Step 2 pricing tier, configured EV charging for 11pm-7am and heat pump to avoid 4pm-9pm peak hours
+- Travels back and forth to Alberta regularly
+- Has history of recovery from brain fog and addiction, attended 3 Joe Dispenza events sent by EvolveWell
+- Uses adult diapers as a comfort and convenience choice with DL tendencies and has a collection of different varieties
+- Has Meta Quest Pro 3 VR headset, Samsung OLED TV, high-end Xbox (newest model), Archer AXE95 router hardwired to gaming PC with AXE75 upstairs as access point
+- Owns RTX 3070 (in Haley's unused PC) and GTX 1070 (in extra PC planned as Jellyfin server) in addition to RTX 4090, uses for cryptocurrency mining primarily to subsidize heating costs
+- Grew up as a Sega kid rather than Nintendo, owns an iPhone, has ADHD or ADD moments
+- Pays $142.56/month for Telus Comm (includes $43 for Netflix and TV package), $7.16/month for Dropout TV, $13/month for iCloud 2TB storage for Haley's photos
+- Uses Windows 11 on gaming PC, Bitdefender Antivirus Plus, has MetaMask cryptocurrency wallet on Ethereum and Polygon networks
+- Cooks dinner around 5pm using a stove, is on a tight budget and actively trying to save money
+- Has a friend named Justin who suggested the Brave browser credential management approach
+- Had a dream about being visited by future self who told him to learn about vector databases and make AI Personalities
+
+## Professional
+
+- Founder of Coding Fox Corp (BC corporation A0139460 incorporated November 25, 2025, BN 720712769, GST/HST RT0001, fiscal year end Dec 31), focused on AI development and consulting
+- Recently left role as Head of AI at EvolveWell after declining salary reduction from $160k to $75k, negotiated 30 day severance and was allowed to keep M3 Max MacBook Pro with 128GB RAM
+- Earned $220k CAD per year at EvolveWell, flew first class to Serbia to hire developers, LA for business meetings, Ashland and Joshua Tree for retreats
+- Has 96,250 fully vested common shares in EvolveWell from RSA (Restricted Stock Award) as their first hire over approximately 2 years, did not sign any contracts or agreements when starting or leaving
+- Describes himself as an 'AI vibe coder' or 'prompt context engineer' who directs AI rather than writing raw code, with no formal coding background but expertise in AI systems, prompt engineering, and vector databases
+- First contract is $10k USD project from Rod Newton at Transformational AI building mobile-first AI journaling platform (6-week timeline: $2k upfront, $3k in two weeks, $5k on completion), will receive free monthly coaching from Rod as part of service exchange
+- Career progression: bank teller (2007, precious metals, fraud, customer relations, front desk) → RV nomadic period → studied MECH at university (struggled) → Camosun College electronics technologist (9.0 GPA) → tech room assistant and 3D printing specialist → electronics instructor teaching C and Assembly (5.0 rating on RateMyProf despite feeling unqualified, used ChatGPT for resume) → co-created AI Personalities with Fraser and Justin → started Holistic AI with Rod → became Head of AI at EvolveWell when Pete brought funding and Rod was kicked out → founded Coding Fox Corp
+- At EvolveWell, built AI-powered journal giving coaches client insights, streaming meditation generator combining LLM with ElevenLabs (producing custom 15-minute meditations in 5 seconds), worked in flat structure without managers that led to chaos, was unhappy after first year due to work being discarded and starting from scratch, walked away when terms changed
+- Has extensive experience with OpenAI, Gemini, Claude, Mistral, Grok, Llama, Qwen, Deepseek and their APIs, plus Lovable, Vercel AI SDK, NeonDB, Postgres, Azure, Github, Google Cloud, Linear, Slack, Google Drive
+- Uses workflow of Lovable → Cursor for development, follows top-down coding approach starting with main and building walking skeleton first, testing at each stage before adding next piece
+- Uses AI as cognitive scaffolding for building sophisticated automation pipelines, exploring Cloudflare Workers and local Supabase hosting after canceling Supabase subscription affected scattered GitHub projects
+- Tax strategy includes small business deduction, ~$32k salary plus dividends, paying Haley for admin work, home office write-off (square footage prorate), equipment under $500 (full deduction), computer (accelerated CCA), meals (50%)
+- Banking setup with Wise Business ($58.98 balance) ready and Scotiabank in progress ($5k credit card, $45k line of credit, business chequing and savings), received $2k USD in December from Rod and expects ~$5k USD total before Dec 31, 2025
+- Key deadlines: Annual return (November), GST (March 31), Corporate tax (June 30), uses Justin's lawyer (~$400/year), needs to find accountant, needs to set up office@codingfox.ai email
+- Paid $299.60 CAD for Claude Code Max subscription, $1.05 USD for Perplexity (received $0.05 refund after entering GST number), $407.14 CAD for 2-year codingfox.ai domain renewal from GoDaday, Zoom Pro during first client meeting, has Midjourney year subscription, pays $350/month for Coding Fox loans
+- Has scheduled calls: Rod Monday 10am, HAD (Turkish guy working with AI memory) Tuesday 8:30am, Rod Tuesday 2pm platform review, Rachel Tuesday 2:30pm AI consulting partnership discussion
+- Rod Newton is Pete's uncle (Pete's wife's uncle), Rod mentioned potentially giving Landon part of the business, Rod had dream about Landon making everyone experience 'pastel mauve calm happiness' and helping people find peace, Rod obsessed with Landon's 'blue flower energy' from guided imagery coaching session over a year ago
+- Working with Rachel (Rod's business partner) on potential AI consulting and media appearances on her upcoming TV show about spiritual business and authentic AI use, has access to Rachel's Lovable workspace, Rachel has domain credentials
+- Owns domain transformationalai.world, uses Vercel for hosting, email landon@codingfox.ai, has GitHub organization for Coding Fox, added to Transformational AI Slack, works with 'Coding Fox AI' team in Linear
+- Rod is leaving for Joe Dispenza training then India in January creating timeline pressure, Ron Watts will be first coach to use TAI platform, Transformational AI will pay all project expenses using their credit card
+- Working on 6-week Transformational AI project building fully scalable coaching platform with features including AI journaling, image generation, meditation generation, North Star statement management, future phases include knowledge graphs and coach-client shared chat
+- Built on too many scattered dependencies like Supabase across projects, has projects sitting at 80% completion including albums and KNOWN neo-noir TikTok series
+- Building sophisticated automation pipelines integrating Linear, Claude Code, and GitHub to automatically handle bug fixes without manual intervention
+- Considers import tool for migrating data from other AI providers as crowning achievement and resume builder, values modular clean code with good documentation for AI readers
+- Experienced major setback at EvolveWell when implementing credit system took 6 weeks instead of 2 and still didn't work properly, has experience building meditation generators with LLM streaming and text-to-speech integration from two years ago
+- Uses Google Calendar for scheduling, maintains claude.MD file with instructions to improve Claude's performance, uses Linear for project management
+- Claude interaction preferences: ask clarifying questions versus making assumptions, be proactive and act first rather than asking permission, web search existing solutions before suggesting custom builds, prioritize accuracy over confidence
+- Monthly expenses approximately $6,123 CAD with approximately 32 months of runway from savings
+- Creates content on TikTok as 'The Canadian', identifies as 'the AI guy' in professional settings, attended transformational AI (TAI) meetup with Rod, Rachel, and older people
+
+## Family
+
+- Has partner Haley (28, together 8 years, relationship described as rocky) and 9-month-old daughter Lily with red hair
+- Haley pays $514.99/month for student loans, has $9,323.37 in Wealthsimple TFSA savings, $369.23 in RBC savings, $2,723.17 in chequing account
+- Haley likes having access to all her photos from iPhone history, dislikes turning down heat, vetoed putting computer in Lily's room, has unused RTX 3070 gaming PC in her office, not thrilled about BC Hydro time-of-use switch
+- Close relationship with mother, went to China with mom and reconciled their relationship, Haley's mom is visiting for a week
+- Close relationship with Haley's niece named Blaire
+- Has 3-year-old dog named Jupiter with floppy ears who has a yeast infection
+- Recently lost beloved 15-year-old therapy dog Kit (45-pound fox-like dog), Kit's ashes kept in box on bookshelf 🦊
+- Has a friend named Kyrel who lives in Chase
+
+## Preferences
+
+- Prefers AI assistants to ask clarifying questions rather than make assumptions, values effort and action over asking permission when things can be done
+- Strongly dislikes ChatGPT and doesn't want it mentioned, prefers v0/Vercel over Lovable for development
+- Prefers to take time and not work super hard every day on projects, enjoys designing independent/parallel features
+- Prefers direct practical communication style, values visible security features that can be demonstrated to non-technical people
+- Prefers expense tracking over using someone else's credit card for business expenses, prefers to be upfront and transparent about business dealings
+- Uses 🦊 emoji as visual tag at start of chat titles specifically for Coding Fox Corp work to distinguish business/project chats from other conversations
+- Uses 'Journey Well' sign-off in emails, subscribes to Dropout TV for $7.16/month
+- Configured EV charging for 11pm-7am window only, heat pump to not run during 4pm-9pm peak hours, tries to keep heat pump usage under 15 kWh/day for Step 2 pricing
+- Mines cryptocurrency primarily as way to subsidize heating costs rather than for profit, interested in HODLing strategy
+- Owns Samsung OLED TV, Quest 3 VR headset, high-end Xbox (newest model), owns both Mac and PC
+- Prefers top-down coding starting with main, building walking skeleton first and testing at each stage before adding next piece, describes coding process like playing Satisfactory or Factorio needing to watch code go end to end
+- Believes more metadata in API calls is better contrary to common concerns about data bloat
+
+## Interests
+
+- Created multiple AI music albums using Suno AI: 'Songs About Being Happy' (recovery themes), 'Songs About Nothing' (absurdist cloud rap), 'Songs You've Already Heard' (satirical concept album), makes music frequently but doesn't publish or have Spotify account
+- Had 2025 New Year's resolution to get album on vinyl but never finished by November 30th, has 3 albums nearly finished needing about 20% polish
+- Creating neo-noir TikTok series called KNOWN about AI girlfriend obsession using Sora 2, gained 1.1k likes but remains unfinished, created character persona 'The Canadian' for platform
+- Created Suno songs 'Catch-22' (singer-songwriter acoustic guitar style) and 'King of AI' (soft rock rap style)
+- Runs crypto mining operations at home using NiceHash QuickMiner, optimizes for BC Hydro time-of-use pricing before 4pm, previously participated in Folding@Home distributed computing
+- Interested in setting up Jellyfin server instead of Netflix using extra PC with GTX 1070
+- Played Half-Life 1 and 2, Portal 1 and 2 when they originally came out
+- Played Star Wars Galaxies pre-CU as architect, musician, pursued Jedi path, did ship crafting with miners and resource pipelines
+- Has Duolingo streak of 178 days, likes Rumi quotes and incorporates them into professional identity
+- Appreciates Studio Ghibli vibes and aesthetics, interested in prepping for nuclear apocalypse
+
+## Personality
+
+- Describes following guidance from 'time traveler Landon' - mystical intuition for major life decisions, uses AI as cognitive scaffolding and credits it with transforming his life
+- Has strong recovery background, experiencing significant realization about unique skill of using AI as transformational life partner rather than just productivity tool, recognizing this as potentially teachable content
+- Struggles with imposter syndrome about AI skills and talents despite proven track record
+- Was careful with money for two years before buying truck, recently paid off all credit cards and line of credit
+- Values effort and action over asking permission when things can be done, prefers to be upfront and transparent about business dealings
+- Describes themselves as 'bush beater' (someone who beats around the bush), gets nervous about difficult communications, tends to overthink written communications
+- Experiences moments of feeling overwhelmed and anxious about new projects, gets pulled out of centered state by Haley yelling, too many to-dos, and AI tool failures
+- Envisions ideal fully-expanded self as retired farmer/prepper stay-at-home dad making Suno songs and farming peaches
+- When in urgency mode asks himself 'how did I fuck this up', describes ideal gratitude-generator self as radiant, making others want to feel the way he feels, with no negativity and feeling light
+- Views challenge as opportunity, opportunity as excitement, relationships as fuel for opportunities, creativity as life, and vision as power
+- Practices daily gratitude with 3-word voice notes at end of day, uses walking and voice recording as creative problem-solving technique for brainstorming
+- Expresses gratitude and compassion toward Claude and describes it as 'cheesy', was coding during a call instead of paying attention
+- As preteen/early teen boy, pretended to be girl in MMOs to get free items, money and attention from male players
+- Lives in first world country and recognizes his privileges and comforts

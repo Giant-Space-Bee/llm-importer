@@ -293,3 +293,71 @@ class TestVerifyAll:
 
         assert len(verified) == 0
         assert len(discarded) == 1  # True hallucination
+
+
+class TestFuzzyMatching:
+    """Test fuzzy matching for near-miss quotes."""
+
+    def test_typo_in_quote_matches_via_fuzzy(self):
+        """Should match when quote has typo like 'Rpd' vs 'Rod'."""
+        from src.verifier import verify_fact
+
+        fact = {
+            "fact": "Rod wants to build a platform",
+            "source_quote": "Rod wants me to build a platform",  # LLM "fixed" Rpd->Rod
+            "source_convo_id": "conv-123",
+        }
+        # Original has typo "Rpd" not "Rod"
+        convo_text = "Rpd wants me to build a platform, a software as a service platform"
+
+        result = verify_fact(fact, convo_text)
+
+        assert result.verified is True
+        assert "fuzzy" in result.match_location.lower()
+
+    def test_minor_word_difference_matches_via_fuzzy(self):
+        """Should match when quote has minor differences."""
+        from src.verifier import verify_fact
+
+        fact = {
+            "fact": "User has a Duolingo streak",
+            "source_quote": "178 day streak on Duolingo",
+            "source_convo_id": "conv-123",
+        }
+        # Original has slightly different phrasing
+        convo_text = "I have a 178-day streak on Duolingo now"
+
+        result = verify_fact(fact, convo_text)
+
+        assert result.verified is True
+
+    def test_completely_different_quote_still_fails(self):
+        """Fuzzy matching should NOT match completely different text."""
+        from src.verifier import verify_fact
+
+        fact = {
+            "fact": "User likes cats",
+            "source_quote": "I love my three cats",
+            "source_convo_id": "conv-123",
+        }
+        convo_text = "I have two dogs that I walk every day"
+
+        result = verify_fact(fact, convo_text)
+
+        assert result.verified is False
+
+    def test_fuzzy_can_be_disabled(self):
+        """Should be able to disable fuzzy matching."""
+        from src.verifier import verify_fact
+
+        fact = {
+            "fact": "Rod wants to build",
+            "source_quote": "Rod wants me to build",
+            "source_convo_id": "conv-123",
+        }
+        convo_text = "Rpd wants me to build a platform"
+
+        # With fuzzy disabled, typo should cause failure
+        result = verify_fact(fact, convo_text, use_fuzzy=False)
+
+        assert result.verified is False

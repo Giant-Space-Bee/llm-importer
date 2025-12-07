@@ -26,6 +26,9 @@ This is a **literal substring search**. Not semantic. Not fuzzy. Not "close enou
 | `"head of AI at EvolveWell"` | `"head of AI"` (msg 1) + `"EvolveWell"` (msg 5) | DELETED |
 | `"Lily is interested in Harry Potter"` | `"lily's 9 3/4 day so we can do the Harry potter thing"` | DELETED |
 | `"Has an electric vehicle"` | `"EV charging (Eevee)"` | DELETED |
+| `"178 day streak"` | `"178-day streak"` (hyphen vs space) | DELETED |
+| `"apple mail on the macbook pro"` | `"mail client on the macbook pro"` (msg 1) + `"apple mail"` (msg 2) | DELETED |
+| `"Rod wants me"` | `"Rpd wants me"` (typo in original) | DELETED |
 
 ### The Right Mental Model
 
@@ -38,11 +41,12 @@ This is a **literal substring search**. Not semantic. Not fuzzy. Not "close enou
 ### The Safe Strategy
 
 1. **Quote LESS, not more** - 5-10 words is ideal, 15 max
-2. **Copy the user's EXACT words** - typos, informal spelling, weird punctuation, ALL of it
-3. **Never replace pronouns** - if user said "me", quote "me" not "the user"
-4. **Never clean up grammar** - if user said "bi weekly", quote "bi weekly"
-5. **Never combine messages** - if info is in two places, pick ONE place to quote
-6. **When in doubt, skip the fact** - a missing fact beats a deleted one
+2. **Copy EXACT words** - typos, informal spelling, weird punctuation, ALL of it (even "Rpd" instead of "Rod")
+3. **Never replace pronouns** - if they said "me", quote "me" not "the user"
+4. **Never clean up grammar** - if they said "bi weekly", quote "bi weekly" not "biweekly"
+5. **Never combine messages** - if info is in two places, pick ONE place to quote from
+6. **Never synthesize** - don't create a phrase that doesn't exist (e.g., "apple mail on the macbook pro" when those words never appear together)
+7. **When in doubt, skip the fact** - a missing fact beats a deleted one
 
 ---
 
@@ -174,6 +178,24 @@ BAD - meaning extraction instead of quoting (WILL FAIL verification):
 ```
 Why it fails: Original said "EV charging (Eevee)" - you wrote a summary, not a quote. Quote the original: "EV charging (Eevee)"
 
+BAD - synthesized quote combining different messages (WILL FAIL verification):
+```json
+{
+  "fact": "Uses Apple Mail on MacBook Pro",
+  "source_quote": "apple mail on the macbook pro"
+}
+```
+Why it fails: Message 1 said "in the mail client on the macbook pro" and message 2 said "apple mail". The combined phrase "apple mail on the macbook pro" never exists. Pick ONE to quote: "mail client on the macbook pro"
+
+BAD - fixing typos (WILL FAIL verification):
+```json
+{
+  "fact": "Rod wants user to build a platform",
+  "source_quote": "Rod wants me to build a platform"
+}
+```
+Why it fails: Original had a typo: "Rpd wants me to build" not "Rod". Copy the typo! Quote: "Rpd wants me to build"
+
 GOOD - short anchor with context in fact:
 ```json
 {
@@ -202,6 +224,6 @@ Why it works: Quote matches original exactly including weird formatting. Fact ha
 
 - No extractable facts? Return empty array: `[]`
 - Code/technical discussion with no personal info? Skip it
-- Focus on USER messages, not assistant responses
+- **Quote from ANY message** - user OR assistant. Both are searchable for verification. If the assistant summarized something correctly, you can quote it.
 
 ## Conversations to Process
