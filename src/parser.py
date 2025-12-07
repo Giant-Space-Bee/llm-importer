@@ -150,12 +150,47 @@ def get_stats_from_parsed(
     )
 
 
+def parse_from_raw(
+    raw: List[Dict[str, Any]],
+    export_type: ExportType
+) -> Tuple[List[Conversation], Optional[UserProfile]]:
+    """
+    Parse conversations from already-loaded raw data.
+
+    Use this when you've already loaded the JSON and want to avoid
+    loading it again. This is the memory-efficient path.
+
+    Args:
+        raw: Already-loaded list of conversation dicts
+        export_type: Detected export type ("chatgpt", "claude", "unknown")
+
+    Returns:
+        - List of linearized Conversations
+        - UserProfile if found (ChatGPT custom instructions only)
+
+    Raises:
+        ValueError: If export type is unknown/unsupported
+    """
+    if export_type not in _PARSERS:
+        supported = ", ".join(_PARSERS.keys())
+        raise ValueError(f"Unknown export type. Expected one of: {supported}")
+
+    parser, profile_extractor = _PARSERS[export_type]
+    conversations = parser(raw)
+    user_profile = profile_extractor(raw) if profile_extractor else None
+
+    return conversations, user_profile
+
+
 def parse_all(path: str) -> Tuple[List[Conversation], Optional[UserProfile]]:
     """
     Main entry point: parse everything.
 
     Auto-detects export type (ChatGPT vs Claude) and uses the appropriate
     parser from the registry.
+
+    Note: This loads the file. If you already have the raw data loaded,
+    use parse_from_raw() instead to avoid double-loading.
 
     Returns:
         - List of linearized Conversations
@@ -166,16 +201,7 @@ def parse_all(path: str) -> Tuple[List[Conversation], Optional[UserProfile]]:
     """
     raw = load_conversations(path)
     export_type = detect_export_type(raw)
-
-    if export_type not in _PARSERS:
-        supported = ", ".join(_PARSERS.keys())
-        raise ValueError(f"Unknown export type. Expected one of: {supported}")
-
-    parser, profile_extractor = _PARSERS[export_type]
-    conversations = parser(raw)
-    user_profile = profile_extractor(raw) if profile_extractor else None
-
-    return conversations, user_profile
+    return parse_from_raw(raw, export_type)
 
 
 # Export all public symbols
@@ -191,6 +217,7 @@ __all__ = [
     "load_conversations",
     "filter_user_messages",
     "get_stats_from_parsed",
+    "parse_from_raw",
     "parse_all",
     # ChatGPT
     "flatten_tree",
