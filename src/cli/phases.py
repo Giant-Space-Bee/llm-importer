@@ -397,6 +397,8 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
             f"({ctx.max_concurrent} concurrent)..."
         )
 
+        extraction_start_time = time.time()
+
         # Checkpoint callback - saves after each chunk completes
         def on_chunk_complete(completed_indices, all_facts):
             save_checkpoint(checkpoint_path, {
@@ -407,6 +409,12 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
                     for f in all_facts
                 ]
             })
+            # Progress feedback
+            elapsed = time.time() - extraction_start_time
+            console.print(
+                f"  [dim]Chunk {len(completed_indices)}/{len(chunks_to_process)} complete, "
+                f"{len(all_facts)} facts ({elapsed:.0f}s elapsed)[/dim]"
+            )
 
         # Process with checkpointing
         result: ParallelResult = process_all_chunks(
@@ -553,7 +561,8 @@ def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
 
     # Run deduplication
     try:
-        ctx.deduplicated_facts = deduplicate(ctx.aggregated_facts, ctx.provider)
+        with console.status("[bold blue]Waiting for LLM response..."):
+            ctx.deduplicated_facts = deduplicate(ctx.aggregated_facts, ctx.provider)
     except Exception as e:
         console.print(f"\n[red]Dedup error:[/red] {e}")
         console.print("[yellow]Aggregated facts preserved in checkpoint for retry.[/yellow]")
@@ -645,12 +654,13 @@ def phase_distill(ctx: PipelineContext) -> PipelineContext:
 
     # Run distillation
     try:
-        ctx.distilled_profile = distill(
-            facts=ctx.deduplicated_facts,
-            provider=ctx.provider,
-            trusted_context=ctx.trusted_context,
-            source_info=source_info,
-        )
+        with console.status("[bold blue]Waiting for LLM response..."):
+            ctx.distilled_profile = distill(
+                facts=ctx.deduplicated_facts,
+                provider=ctx.provider,
+                trusted_context=ctx.trusted_context,
+                source_info=source_info,
+            )
     except Exception as e:
         console.print(f"\n[red]Distill error:[/red] {e}")
         console.print("[yellow]Deduplicated facts preserved in checkpoint for retry.[/yellow]")
