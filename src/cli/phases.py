@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from src.parser import (
-    parse_all,
+    parse_from_raw,
     get_stats_from_parsed,
     detect_export_type,
     load_conversations,
@@ -75,14 +75,12 @@ def phase_parse(ctx: PipelineContext) -> PipelineContext:
     start_time = time.time()
 
     show_phase_header(console, 1, "PARSE")
-    conversations, user_profile = parse_all(ctx.input_file)
-    stats = get_stats_from_parsed(conversations, user_profile)
 
-    # Load raw conversations for verification (need full message tree)
+    # Single load - parse and keep raw for verification
     raw_convos = load_conversations(ctx.input_file)
-
-    # Detect export type first (determines which ID field to use)
     export_type = detect_export_type(raw_convos)
+    conversations, user_profile = parse_from_raw(raw_convos, export_type)
+    stats = get_stats_from_parsed(conversations, user_profile)
 
     # Build lookup using correct ID field (ChatGPT uses 'id', Claude uses 'uuid')
     id_field = "uuid" if export_type == "claude" else "id"
@@ -211,6 +209,9 @@ def phase_chunk(ctx: PipelineContext) -> PipelineContext:
     elapsed = time.time() - start_time
     ctx.phase_timings["chunk"] = elapsed
     show_phase_complete(console, elapsed)
+
+    # Free memory - parsed conversations no longer needed after chunking
+    ctx.conversations = []
 
     return ctx
 
@@ -466,6 +467,10 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
 
     ctx.verified_facts = verified_facts
     ctx.phase_timings["extract"] = elapsed
+
+    # Free memory - raw conversations no longer needed after verification
+    ctx.raw_conversations_by_id = {}
+
     return ctx
 
 
@@ -648,7 +653,7 @@ def phase_distill(ctx: PipelineContext) -> PipelineContext:
 
     # Engineering data: input count
     input_count = len(ctx.deduplicated_facts)
-    source_info = f"{ctx.export_type or 'Unknown'} export ({len(ctx.conversations)} conversations)"
+    source_info = f"{ctx.export_type or 'Unknown'} export ({ctx.stats.total_conversations} conversations)"
 
     console.print(f"Distilling {input_count} facts into memory profile...")
 
