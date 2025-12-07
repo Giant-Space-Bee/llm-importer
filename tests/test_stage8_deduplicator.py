@@ -57,6 +57,8 @@ def make_aggregated(
     return AggregatedFact(
         fact=make_extracted(fact, category=category, source_timestamp=source_timestamp),
         frequency=frequency,
+        min_timestamp=source_timestamp,
+        max_timestamp=source_timestamp,
     )
 
 
@@ -134,11 +136,12 @@ class TestBuildDedupPrompt:
         prompt = build_dedup_prompt(facts)
         assert '"frequency": 5' in prompt or '"frequency":5' in prompt
 
-    def test_includes_timestamp(self):
-        """Prompt should show source_timestamp."""
+    def test_includes_period(self):
+        """Prompt should show period derived from timestamps."""
         facts = [make_aggregated("Test fact", source_timestamp=1234.0)]
         prompt = build_dedup_prompt(facts)
-        assert "1234" in prompt
+        # Period is formatted as "YYYY-MM-DD to YYYY-MM-DD"
+        assert '"period":' in prompt or '"period": ' in prompt
 
     def test_includes_category_as_hint(self):
         """Original category should be shown but not enforced."""

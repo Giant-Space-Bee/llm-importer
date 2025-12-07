@@ -210,9 +210,9 @@ class TestGroupByCategory:
     def test_groups_by_category(self):
         """Facts should be organized into category buckets."""
         aggregated = [
-            AggregatedFact(make_fact("Lives in Seattle", category="personal"), 2),
-            AggregatedFact(make_fact("Works at Microsoft", category="professional"), 1),
-            AggregatedFact(make_fact("Likes hiking", category="interests"), 3),
+            AggregatedFact(make_fact("Lives in Seattle", category="personal"), 2, 0.0, 0.0),
+            AggregatedFact(make_fact("Works at Microsoft", category="professional"), 1, 0.0, 0.0),
+            AggregatedFact(make_fact("Likes hiking", category="interests"), 3, 0.0, 0.0),
         ]
         result = group_by_category(aggregated)
 
@@ -227,9 +227,9 @@ class TestGroupByCategory:
     def test_multiple_facts_same_category(self):
         """Multiple facts in same category should be in same list."""
         aggregated = [
-            AggregatedFact(make_fact("Lives in Seattle", category="personal"), 2),
-            AggregatedFact(make_fact("Age is 30", category="personal"), 1),
-            AggregatedFact(make_fact("Name is John", category="personal"), 1),
+            AggregatedFact(make_fact("Lives in Seattle", category="personal"), 2, 0.0, 0.0),
+            AggregatedFact(make_fact("Age is 30", category="personal"), 1, 0.0, 0.0),
+            AggregatedFact(make_fact("Name is John", category="personal"), 1, 0.0, 0.0),
         ]
         result = group_by_category(aggregated)
 
@@ -245,7 +245,7 @@ class TestGroupByCategory:
     def test_preserves_frequency(self):
         """Frequency should be preserved in grouped facts."""
         aggregated = [
-            AggregatedFact(make_fact("Lives in Seattle", category="personal"), 5),
+            AggregatedFact(make_fact("Lives in Seattle", category="personal"), 5, 0.0, 0.0),
         ]
         result = group_by_category(aggregated)
 
@@ -255,7 +255,7 @@ class TestGroupByCategory:
         """Should handle all valid categories."""
         categories = ["personal", "professional", "family", "preferences", "interests", "personality"]
         aggregated = [
-            AggregatedFact(make_fact(f"Fact for {cat}", category=cat), 1)
+            AggregatedFact(make_fact(f"Fact for {cat}", category=cat), 1, 0.0, 0.0)
             for cat in categories
         ]
         result = group_by_category(aggregated)
