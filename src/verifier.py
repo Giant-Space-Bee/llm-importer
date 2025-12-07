@@ -4,15 +4,25 @@ verifier.py - Hallucination detection via string matching
 NO LLM NEEDED. Pure text search.
 Match source_quote back to original conversation.
 No match = hallucinated = discard.
+
+Verification strategy:
+1. Exact substring match (after normalization)
+2. Fuzzy match fallback (handles typos, minor paraphrasing)
+3. Search all conversations (handles wrong conversation ID)
 """
 
-from typing import List, Tuple, Union, Any, Dict, TYPE_CHECKING
+from typing import List, Tuple, Union, Any, Dict, TYPE_CHECKING, Optional
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 
 from src.parser import flatten_tree
 
 if TYPE_CHECKING:
     from src.extractor import ExtractedFact
+
+# Fuzzy matching threshold (0.0 to 1.0)
+# 0.85 = 85% similar - catches typos like "Rpd" vs "Rod" but rejects paraphrasing
+FUZZY_MATCH_THRESHOLD = 0.85
 
 # Type alias for facts - can be dict or ExtractedFact dataclass
 Fact = Union[Dict[str, Any], "ExtractedFact"]
@@ -70,13 +80,18 @@ class VerificationResult:
     match_location: str  # Where the quote was found (or "NOT FOUND")
 
 
-def verify_fact(fact: Fact, conversation_text: str) -> VerificationResult:
+def verify_fact(fact: Fact, conversation_text: str, use_fuzzy: bool = True) -> VerificationResult:
     """
     Verify a single fact by finding its source_quote in conversation text.
+
+    Verification strategy:
+    1. Try exact substring match (after normalization)
+    2. If use_fuzzy=True, try fuzzy match as fallback
 
     Args:
         fact: Dict or ExtractedFact with source_quote field
         conversation_text: Full conversation text (ALL messages, not just user)
+        use_fuzzy: Whether to try fuzzy matching if exact match fails
 
     Returns:
         VerificationResult with verified=True if quote found
@@ -95,19 +110,32 @@ def verify_fact(fact: Fact, conversation_text: str) -> VerificationResult:
     normalized_quote = normalize_text(source_quote)
     normalized_convo = normalize_text(conversation_text)
 
-    # Check if quote exists in conversation
+    # Strategy 1: Exact substring match
     if normalized_quote in normalized_convo:
         return VerificationResult(
             fact=fact,
             verified=True,
-            match_location="FOUND"
+            match_location="FOUND (exact)"
         )
-    else:
-        return VerificationResult(
-            fact=fact,
-            verified=False,
-            match_location="NOT FOUND"
-        )
+
+    # Strategy 2: Fuzzy match fallback
+    if use_fuzzy:
+        fuzzy_result = fuzzy_find_in_text(normalized_quote, normalized_convo)
+        if fuzzy_result:
+            # Calculate actual ratio for logging
+            ratio = SequenceMatcher(None, normalized_quote, fuzzy_result).ratio()
+            log_fuzzy_match(fact, fuzzy_result, ratio)
+            return VerificationResult(
+                fact=fact,
+                verified=True,
+                match_location=f"FOUND (fuzzy {ratio:.0%})"
+            )
+
+    return VerificationResult(
+        fact=fact,
+        verified=False,
+        match_location="NOT FOUND"
+    )
 
 
 def verify_all(
@@ -170,26 +198,42 @@ def verify_all(
 
 def _find_quote_in_conversations(
     source_quote: str,
-    conversations: Dict[str, Any]
+    conversations: Dict[str, Any],
+    use_fuzzy: bool = True
 ) -> str:
     """
     Search all conversations for a quote, return conversation ID if found.
 
+    Uses two-pass search:
+    1. Try exact match in all conversations
+    2. If use_fuzzy=True, try fuzzy match in all conversations
+
     Args:
         source_quote: The quote to search for
         conversations: Dict mapping convo_id -> raw conversation dict
+        use_fuzzy: Whether to try fuzzy matching if exact match fails
 
     Returns:
         Conversation ID where quote was found, or empty string if not found
     """
     normalized_quote = normalize_text(source_quote)
 
+    # Pass 1: Exact match
     for convo_id, convo_raw in conversations.items():
         convo_text = conversation_to_text(convo_raw)
         if convo_text:
             normalized_convo = normalize_text(convo_text)
             if normalized_quote in normalized_convo:
                 return convo_id
+
+    # Pass 2: Fuzzy match
+    if use_fuzzy:
+        for convo_id, convo_raw in conversations.items():
+            convo_text = conversation_to_text(convo_raw)
+            if convo_text:
+                normalized_convo = normalize_text(convo_text)
+                if fuzzy_find_in_text(normalized_quote, normalized_convo):
+                    return convo_id
 
     return ""
 
@@ -256,6 +300,61 @@ def normalize_text(text: str) -> str:
     text = text.strip()
 
     return text
+
+
+def fuzzy_find_in_text(quote: str, text: str, threshold: float = FUZZY_MATCH_THRESHOLD) -> Optional[str]:
+    """
+    Find a fuzzy match for quote within text.
+
+    Uses sliding window approach: check each window of text that's roughly
+    the same length as the quote, find the best match above threshold.
+
+    Args:
+        quote: The normalized quote to search for
+        text: The normalized text to search in
+        threshold: Minimum similarity ratio (0.0 to 1.0)
+
+    Returns:
+        The matching substring from text if found, None otherwise
+    """
+    if not quote or not text:
+        return None
+
+    quote_len = len(quote)
+    text_len = len(text)
+
+    if quote_len > text_len:
+        return None
+
+    # For short quotes, require higher similarity to avoid false positives
+    if quote_len < 20:
+        threshold = max(threshold, 0.90)
+
+    best_match = None
+    best_ratio = threshold  # Only accept matches above threshold
+
+    # Sliding window: check windows of varying sizes around quote length
+    # This handles cases where quote has extra/missing words
+    for window_size in range(max(10, quote_len - 10), min(text_len + 1, quote_len + 20)):
+        for start in range(0, text_len - window_size + 1, 5):  # Step by 5 for efficiency
+            window = text[start:start + window_size]
+            ratio = SequenceMatcher(None, quote, window).ratio()
+
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_match = window
+
+    return best_match
+
+
+def log_fuzzy_match(fact: Fact, matched_text: str, ratio: float) -> None:
+    """Log when we verify via fuzzy match (for monitoring)."""
+    import sys
+    quote = get_fact_attr(fact, "source_quote", "")[:40]
+    print(
+        f"[FUZZY MATCH] {ratio:.0%} similarity: '{quote}...' matched '{matched_text[:40]}...'",
+        file=sys.stderr
+    )
 
 
 def log_hallucination(fact: Fact, reason: str = "") -> None:
