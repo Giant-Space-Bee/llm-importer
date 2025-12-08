@@ -50,6 +50,8 @@ from src.config import (
     # Local LLM
     LOCAL_LLM_BASE_URL,
     DEFAULT_LOCAL_MODEL,
+    LOCAL_LLM_REPETITION_PENALTY,
+    LOCAL_LLM_TOP_P,
     # Model
     DEFAULT_MODEL,
     STRUCTURED_OUTPUTS_BETA,
@@ -166,6 +168,8 @@ class LocalProvider(LLMProvider):
             ],
             "temperature": DEFAULT_TEMPERATURE,
             "max_tokens": DEFAULT_MAX_TOKENS,
+            "top_p": LOCAL_LLM_TOP_P,
+            "repetition_penalty": LOCAL_LLM_REPETITION_PENALTY,
         }
 
         data = self._make_request(url, payload)
@@ -198,6 +202,8 @@ class LocalProvider(LLMProvider):
             ],
             "temperature": DEFAULT_TEMPERATURE,
             "max_tokens": DEFAULT_MAX_TOKENS,
+            "top_p": LOCAL_LLM_TOP_P,
+            "repetition_penalty": LOCAL_LLM_REPETITION_PENALTY,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {

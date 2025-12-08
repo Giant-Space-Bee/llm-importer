@@ -89,6 +89,34 @@ STRUCTURED_OUTPUTS_BETA = "structured-outputs-2025-11-13"
 
 
 # =============================================================================
+# LOCAL LLM INFERENCE PARAMETERS
+# =============================================================================
+# These parameters control text generation for local LLMs (LM Studio).
+# Tuned for Mistral-family models doing JSON extraction.
+#
+# Research findings:
+# - Small instruct models (7B-14B) benefit from repetition_penalty to avoid
+#   phrase loops like "Has a preference for..." repeated dozens of times
+# - Temperature 0.2-0.3 works well for structured output (not 0 - causes loops)
+# - top_p 0.9 is a standard quality setting that doesn't constrain too much
+#
+# Env vars: LLM_IMPORTER_REPETITION_PENALTY, LLM_IMPORTER_TOP_P
+
+# Repetition penalty discourages repeating the same phrases
+# 1.0 = disabled, 1.1 = mild penalty, 1.2+ = aggressive
+# Mistral-specific: helps prevent "Has a preference for X" loops
+_FALLBACK_REPETITION_PENALTY = 1.1
+LOCAL_LLM_REPETITION_PENALTY = float(
+    os.getenv("LLM_IMPORTER_REPETITION_PENALTY", _FALLBACK_REPETITION_PENALTY)
+)
+
+# Top-p (nucleus) sampling - only sample from top P probability mass
+# 1.0 = disabled, 0.9 = standard quality, lower = more focused
+_FALLBACK_TOP_P = 0.9
+LOCAL_LLM_TOP_P = float(os.getenv("LLM_IMPORTER_TOP_P", _FALLBACK_TOP_P))
+
+
+# =============================================================================
 # VERIFICATION CONSTANTS
 # =============================================================================
 
