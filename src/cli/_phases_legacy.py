@@ -237,43 +237,6 @@ def phase_chunk(ctx: PipelineContext) -> PipelineContext:
     return ctx
 
 
-def phase_check_resume(ctx: PipelineContext) -> PipelineContext:
-    """Check for checkpoint and set up resume state.
-
-    Args:
-        ctx: Pipeline context with chunks populated.
-
-    Returns:
-        Updated context with remaining_indices and existing_facts.
-
-    Example:
-        >>> ctx = phase_check_resume(ctx)
-        >>> print(f"{len(ctx.remaining_indices)} chunks remaining")
-    """
-    completed_chunks, existing_facts, signal = check_existing_checkpoint(
-        ctx.console, ctx.input_file, ctx.resume_mode
-    )
-
-    if ctx.resume_mode and signal == -1:
-        # Resuming from checkpoint
-        ctx.remaining_indices = get_remaining_chunks(
-            {"completed_chunks": completed_chunks},
-            len(ctx.chunks)
-        )
-        ctx.existing_facts = existing_facts
-    else:
-        # Starting fresh
-        ctx.remaining_indices = list(range(len(ctx.chunks)))
-        ctx.existing_facts = []
-
-    if not ctx.remaining_indices:
-        ctx.console.print("\n[green]All chunks already processed![/green]")
-    else:
-        ctx.console.print(f"\n[bold]Processing {len(ctx.remaining_indices)} chunks...[/bold]")
-
-    return ctx
-
-
 def process_sequential_with_checkpoints(
     ctx: PipelineContext,
 ) -> tuple[List[ExtractedFact], List[str]]:
