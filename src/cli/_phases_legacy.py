@@ -41,6 +41,7 @@ from src.cli.display import (
 from src.cli.validation import find_memories_json
 from src.cli.providers import select_provider as _select_provider
 from src.cli.checkpoints import get_checkpoint_path, check_existing_checkpoint
+from src.cli.phases._checkpoint import build_checkpoint_dict
 
 
 # Demo mode uses smaller chunks for faster testing
@@ -326,14 +327,11 @@ def process_sequential_with_checkpoints(
 
         # Save checkpoint
         completed.add(chunk_idx)
-        save_checkpoint(checkpoint_path, {
-            "source_file_hash": hash_file(input_file),
-            "completed_chunks": sorted(completed),
-            "verified_facts": [
-                asdict(f) if isinstance(f, ExtractedFact) else f
-                for f in all_facts
-            ]
-        })
+        save_checkpoint(checkpoint_path, build_checkpoint_dict(
+            source_file_hash=hash_file(input_file),
+            completed_chunks=completed,
+            verified_facts=all_facts,
+        ))
 
     return all_facts, all_hallucinations  # type: ignore
 
@@ -422,14 +420,11 @@ def phase_extract(ctx: PipelineContext) -> PipelineContext:
 
         # Checkpoint callback - saves after each chunk completes
         def on_chunk_complete(completed_indices, all_facts):
-            save_checkpoint(checkpoint_path, {
-                "source_file_hash": file_hash,
-                "completed_chunks": sorted(completed_indices),
-                "verified_facts": [
-                    asdict(f) if isinstance(f, ExtractedFact) else f
-                    for f in all_facts
-                ]
-            })
+            save_checkpoint(checkpoint_path, build_checkpoint_dict(
+                source_file_hash=file_hash,
+                completed_chunks=completed_indices,
+                verified_facts=all_facts,
+            ))
             # Progress feedback
             elapsed = time.time() - extraction_start_time
             console.print(
@@ -604,19 +599,13 @@ def phase_deduplicate(ctx: PipelineContext) -> PipelineContext:
     )
 
     # Save checkpoint with dedup results
-    save_checkpoint(checkpoint_path, {
-        "source_file_hash": hash_file(ctx.input_file),
-        "completed_chunks": list(range(len(ctx.chunks))),
-        "verified_facts": [
-            asdict(f) if isinstance(f, ExtractedFact) else f
-            for f in ctx.verified_facts
-        ],
-        "dedup_completed": True,
-        "deduplicated_facts": [
-            asdict(f) if isinstance(f, DeduplicatedFact) else f
-            for f in ctx.deduplicated_facts
-        ],
-    })
+    save_checkpoint(checkpoint_path, build_checkpoint_dict(
+        source_file_hash=hash_file(ctx.input_file),
+        completed_chunks=range(len(ctx.chunks)),
+        verified_facts=ctx.verified_facts,
+        dedup_completed=True,
+        deduplicated_facts=ctx.deduplicated_facts,
+    ))
 
     ctx.phase_timings["deduplicate"] = elapsed
     show_phase_complete(console, elapsed)
@@ -701,21 +690,15 @@ def phase_distill(ctx: PipelineContext) -> PipelineContext:
     )
 
     # Save checkpoint with distill results
-    save_checkpoint(checkpoint_path, {
-        "source_file_hash": hash_file(ctx.input_file),
-        "completed_chunks": list(range(len(ctx.chunks))),
-        "verified_facts": [
-            asdict(f) if isinstance(f, ExtractedFact) else f
-            for f in ctx.verified_facts
-        ],
-        "dedup_completed": True,
-        "deduplicated_facts": [
-            asdict(f) if isinstance(f, DeduplicatedFact) else f
-            for f in ctx.deduplicated_facts
-        ],
-        "distill_completed": True,
-        "distilled_profile": asdict(ctx.distilled_profile),
-    })
+    save_checkpoint(checkpoint_path, build_checkpoint_dict(
+        source_file_hash=hash_file(ctx.input_file),
+        completed_chunks=range(len(ctx.chunks)),
+        verified_facts=ctx.verified_facts,
+        dedup_completed=True,
+        deduplicated_facts=ctx.deduplicated_facts,
+        distill_completed=True,
+        distilled_profile=ctx.distilled_profile,
+    ))
 
     ctx.phase_timings["distill"] = elapsed
     show_phase_complete(console, elapsed)
