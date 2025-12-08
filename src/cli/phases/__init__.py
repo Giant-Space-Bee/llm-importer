@@ -9,7 +9,7 @@ Example:
     >>> ctx = phase_parse(ctx)
 """
 
-# Migrated phases
+# All phases migrated to their own modules
 from src.cli.phases.aggregate import phase_aggregate
 from src.cli.phases.output import phase_output
 from src.cli.phases.resume import phase_check_resume
@@ -18,12 +18,7 @@ from src.cli.phases.chunk import phase_chunk, DEMO_CHUNK_SIZE
 from src.cli.phases.parse import phase_parse
 from src.cli.phases.deduplicate import phase_deduplicate
 from src.cli.phases.distill import phase_distill
-
-# Re-export from legacy module during migration
-from src.cli._phases_legacy import (
-    process_sequential_with_checkpoints,
-    phase_extract,
-)
+from src.cli.phases.extract import phase_extract, process_sequential_with_checkpoints
 
 __all__ = [
     "DEMO_CHUNK_SIZE",
