@@ -44,6 +44,24 @@ A fact is something specific about the user. Look for:
 
 ---
 
+## AVOID REPETITIVE PHRASING
+
+Do NOT start multiple facts with the same phrase. Vary your wording.
+
+**Observed bad pattern:** "Has a preference for X" repeated many times.
+
+Instead of:
+- "Has a preference for React"
+- "Has a preference for dark mode"
+- "Has a preference for morning work"
+
+Use varied phrasing:
+- "Uses React as primary framework"
+- "Prefers dark mode interfaces"
+- "Works best in the morning"
+
+---
+
 ## STEP 3: COPY THE EXACT QUOTE
 
 THIS IS THE MOST IMPORTANT STEP. READ CAREFULLY.
@@ -424,8 +442,17 @@ Skip these - they are NOT useful facts:
 - Transient requests ("Can you help me write an email?")
 - Hypotheticals ("If I were to start a business...")
 - Generic statements ("I like good food" - too vague)
+- Tech tool choices in project discussions ("I'll use Vercel for hosting")
 
-Focus on facts that help understand WHO THIS PERSON IS.
+**The Therapist Test:** Would a therapist or life coach care about this fact?
+- "Meditates daily" → YES (extract)
+- "Uses Vercel" → NO (skip)
+- "Struggles with perfectionism" → YES (extract)
+- "Prefers PostgreSQL over MongoDB" → NO (skip)
+- "Has a daughter named Lily" → YES (extract)
+- "Uses VS Code" → NO (skip)
+
+Focus on facts that help understand WHO THIS PERSON IS - their inner life, relationships, values, and growth.
 
 ---
 
