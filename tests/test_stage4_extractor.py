@@ -83,14 +83,16 @@ class TestCategories:
     """Valid fact categories."""
 
     def test_has_expected_categories(self):
-        """Should have all 6 categories."""
-        assert "personal" in CATEGORIES
-        assert "professional" in CATEGORIES
-        assert "family" in CATEGORIES
-        assert "preferences" in CATEGORIES
-        assert "interests" in CATEGORIES
-        assert "personality" in CATEGORIES
-        assert len(CATEGORIES) == 6
+        """Should have all 8 growth-focused categories."""
+        assert "identity" in CATEGORIES
+        assert "values" in CATEGORIES
+        assert "emotions" in CATEGORIES
+        assert "relationships" in CATEGORIES
+        assert "growth" in CATEGORIES
+        assert "history" in CATEGORIES
+        assert "practices" in CATEGORIES
+        assert "shadows" in CATEGORIES
+        assert len(CATEGORIES) == 8
 
 
 class TestBuildExtractionPrompt:

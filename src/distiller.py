@@ -27,8 +27,17 @@ from src.deduplicator import DeduplicatedFact
 from src.providers import LLMProvider
 
 
-# Categories for the memory profile
-CATEGORIES = ["personal", "professional", "family", "preferences", "interests", "personality"]
+# Categories for the memory profile (must match extractor.py)
+CATEGORIES = [
+    "identity",       # Who: name, age, location, background, self-description
+    "values",         # What matters: beliefs, principles, priorities
+    "emotions",       # Feeling patterns: recurring emotions, triggers, coping
+    "relationships",  # People: family, friends, partners, pets, dynamics
+    "growth",         # Goals: aspirations, dreams, what they're building toward
+    "history",        # Past: life events, milestones, formative experiences
+    "practices",      # Habits: routines, self-care, meditation, therapy, journaling
+    "shadows",        # Depths: patterns to transform, fears, blocks, inner conflicts
+]
 
 
 # JSON schema for structured output from LLM
@@ -52,12 +61,14 @@ DISTILL_SCHEMA = {
         "categories": {
             "type": "object",
             "properties": {
-                "personal": {"type": "array", "items": FACT_WITH_PERIOD},
-                "professional": {"type": "array", "items": FACT_WITH_PERIOD},
-                "family": {"type": "array", "items": FACT_WITH_PERIOD},
-                "preferences": {"type": "array", "items": FACT_WITH_PERIOD},
-                "interests": {"type": "array", "items": FACT_WITH_PERIOD},
-                "personality": {"type": "array", "items": FACT_WITH_PERIOD},
+                "identity": {"type": "array", "items": FACT_WITH_PERIOD},
+                "values": {"type": "array", "items": FACT_WITH_PERIOD},
+                "emotions": {"type": "array", "items": FACT_WITH_PERIOD},
+                "relationships": {"type": "array", "items": FACT_WITH_PERIOD},
+                "growth": {"type": "array", "items": FACT_WITH_PERIOD},
+                "history": {"type": "array", "items": FACT_WITH_PERIOD},
+                "practices": {"type": "array", "items": FACT_WITH_PERIOD},
+                "shadows": {"type": "array", "items": FACT_WITH_PERIOD},
             },
             "required": CATEGORIES,
             "additionalProperties": False,

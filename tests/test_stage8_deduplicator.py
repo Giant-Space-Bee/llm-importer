@@ -118,7 +118,7 @@ class TestDedupSchema:
         """Category should be constrained to valid values."""
         item_props = DEDUP_SCHEMA["properties"]["facts"]["items"]["properties"]
         assert "enum" in item_props["category"]
-        expected = ["personal", "professional", "family", "preferences", "interests", "personality"]
+        expected = ["identity", "values", "emotions", "relationships", "growth", "history", "practices", "shadows"]
         assert item_props["category"]["enum"] == expected
 
 

@@ -13,14 +13,26 @@ Return a JSON object with this exact structure:
 {
   "name": "extracted name or 'User'",
   "categories": {
-    "personal": [{"fact": "...", "period": "..."}],
-    "professional": [{"fact": "...", "period": "..."}],
-    "family": [{"fact": "...", "period": "..."}],
-    "preferences": [{"fact": "...", "period": "..."}],
-    "interests": [{"fact": "...", "period": "..."}],
-    "personality": [{"fact": "...", "period": "..."}]
+    "identity": [{"fact": "...", "period": "..."}],
+    "values": [{"fact": "...", "period": "..."}],
+    "emotions": [{"fact": "...", "period": "..."}],
+    "relationships": [{"fact": "...", "period": "..."}],
+    "growth": [{"fact": "...", "period": "..."}],
+    "history": [{"fact": "...", "period": "..."}],
+    "practices": [{"fact": "...", "period": "..."}],
+    "shadows": [{"fact": "...", "period": "..."}]
   }
 }
+
+Category definitions:
+- identity: Who they are - name, age, location, background, self-descriptions
+- values: What matters - beliefs, principles, priorities, ethics
+- emotions: Feeling patterns - recurring emotions, triggers, coping mechanisms
+- relationships: People - family, friends, partners, pets, interpersonal dynamics
+- growth: Goals - aspirations, dreams, what they're building toward
+- history: Past - life events, milestones, formative experiences
+- practices: Habits - routines, self-care, meditation, therapy, journaling
+- shadows: Depths - recognized patterns to transform, fears, blocks, inner conflicts
 
 Guidelines:
 - Extract the user's name from facts if mentioned, otherwise use "User"

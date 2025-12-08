@@ -1,0 +1,446 @@
+# FACT EXTRACTION - STEP BY STEP INSTRUCTIONS
+
+You are extracting facts about a person from their conversations. Follow these instructions EXACTLY.
+
+---
+
+## YOUR TASK
+
+Read each conversation below. Find facts about the USER (the human, not the AI assistant). Return them as JSON.
+
+---
+
+## STEP 1: READ THE INPUT FORMAT
+
+Each conversation looks like this:
+
+```
+=== Conversation: Career Discussion ===
+ID: abc-123-def-456
+Created: 1700000000.0
+
+[User (2024-03-15)]: I'm thinking about switching careers. I'm 32 and work as a software engineer.
+
+[Assistant (2024-03-15)]: That's an interesting consideration...
+```
+
+Important fields:
+- **ID**: Use this for `source_convo_id` (example: `abc-123-def-456`)
+- **Created**: Use this for `source_timestamp` (example: `1700000000.0`)
+
+---
+
+## STEP 2: IDENTIFY FACTS ABOUT THE USER
+
+A fact is something specific about the user. Look for:
+- Who they are (name, age, location, job)
+- What they believe or care about
+- How they feel or react
+- Who is in their life (family, friends)
+- What they want or are working toward
+- What has happened to them
+- What habits or practices they have
+- What patterns they recognize in themselves
+
+---
+
+## STEP 3: COPY THE EXACT QUOTE
+
+THIS IS THE MOST IMPORTANT STEP. READ CAREFULLY.
+
+For each fact, you must provide a `source_quote`. This quote is VERIFIED by computer code:
+
+```python
+if source_quote in conversation_text:
+    KEEP the fact
+else:
+    DELETE the fact (treated as hallucination)
+```
+
+The verification is a LITERAL substring search. Your quote must exist EXACTLY in the text.
+
+### RULES FOR source_quote:
+
+1. COPY the exact words. Do not change anything.
+2. Keep it SHORT: 5-15 words is best.
+3. Do NOT use "..." to shorten. Either copy the full phrase or pick a shorter one.
+4. Do NOT fix typos. If they wrote "Rpd" instead of "Rod", copy "Rpd".
+5. Do NOT clean up grammar. If they wrote "bi weekly", copy "bi weekly" not "biweekly".
+6. Do NOT replace pronouns. If they said "me", copy "me" not "the user".
+7. Do NOT combine text from different messages.
+
+---
+
+## STEP 4: CATEGORIZE EACH FACT
+
+Put each fact in ONE of these 8 categories:
+
+### identity
+Who they are. Name, age, location, background, profession.
+- "Is 32 years old"
+- "Lives in Portland, Oregon"
+- "Works as a software engineer"
+- "Originally from Texas"
+- "Describes self as an introvert"
+
+### values
+What matters to them. Beliefs, principles, priorities.
+- "Believes in radical honesty"
+- "Prioritizes family over career"
+- "Values authenticity in relationships"
+- "Passionate about psychology"
+- "Cares deeply about environmental issues"
+
+### emotions
+How they feel. Emotional patterns, triggers, coping.
+- "Gets anxious before presentations"
+- "Tends to shut down during conflict"
+- "Feels energized by creative work"
+- "Gets frustrated when plans change"
+- "Feels calm in nature"
+
+### relationships
+People in their life. Family, friends, partners, pets.
+- "Has a daughter named Lily"
+- "Married to Sarah"
+- "Has a dog named Luna"
+- "Close with sister Maya"
+- "Father passed away in 2020"
+
+### growth
+What they are working toward. Goals, dreams, aspirations.
+- "Wants to become a therapist"
+- "Working on setting better boundaries"
+- "Learning to meditate"
+- "Saving for a house"
+- "Training for a marathon"
+
+### history
+Their past. Life events, milestones, experiences.
+- "Grew up in a small town"
+- "Parents divorced when they were 12"
+- "Graduated from Stanford"
+- "Lived in Japan for 2 years"
+- "Went through a difficult breakup in 2022"
+
+### practices
+Their habits and routines. Self-care, meditation, therapy.
+- "Meditates every morning"
+- "Journals before bed"
+- "Sees a therapist weekly"
+- "Does yoga three times a week"
+- "Takes daily walks"
+
+### shadows
+Their inner work. Patterns to change, fears, blocks.
+- "Tends to people-please"
+- "Has a fear of abandonment"
+- "Recognizes pattern of self-sabotage"
+- "Struggles with perfectionism"
+- "Gets defensive when receiving feedback"
+
+---
+
+## STEP 5: FORMAT AS JSON
+
+Return your facts in this exact format:
+
+```json
+{
+  "facts": [
+    {
+      "fact": "Is 32 years old",
+      "category": "identity",
+      "source_convo_id": "abc-123-def-456",
+      "source_timestamp": 1700000000.0,
+      "source_quote": "I'm 32"
+    }
+  ]
+}
+```
+
+Every fact MUST have all 5 fields:
+- `fact`: What you learned about the user (string)
+- `category`: One of the 8 categories above (string)
+- `source_convo_id`: The conversation ID from the header (string)
+- `source_timestamp`: The timestamp from the header (number)
+- `source_quote`: EXACT text from the conversation (string, 5-15 words)
+
+---
+
+## COMPLETE EXAMPLE
+
+### Input:
+```
+=== Conversation: Life Changes ===
+ID: conv-12345
+Created: 1709251200.0
+
+[User (2024-03-01)]: I've been thinking a lot about my life lately. I'm 35 and I've been working as an accountant for 10 years. But I've always been passionate about psychology.
+
+[Assistant (2024-03-01)]: It sounds like you're at a meaningful crossroads...
+
+[User (2024-03-01)]: Yeah. My therapist says I tend to people-please, which is why I stayed in this job so long. I want to go back to school for psychology.
+
+[Assistant (2024-03-01)]: That's wonderful self-awareness...
+
+[User (2024-03-01)]: My wife Sarah is really supportive. And our daughter Lily, she's 7, she doesn't really understand but she's excited about the idea of dad being a "feelings doctor."
+```
+
+### Output:
+```json
+{
+  "facts": [
+    {
+      "fact": "Is 35 years old",
+      "category": "identity",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "I'm 35"
+    },
+    {
+      "fact": "Has worked as an accountant for 10 years",
+      "category": "identity",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "working as an accountant for 10 years"
+    },
+    {
+      "fact": "Is passionate about psychology",
+      "category": "values",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "passionate about psychology"
+    },
+    {
+      "fact": "Sees a therapist",
+      "category": "practices",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "My therapist"
+    },
+    {
+      "fact": "Tends to people-please",
+      "category": "shadows",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "I tend to people-please"
+    },
+    {
+      "fact": "Wants to go back to school for psychology",
+      "category": "growth",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "go back to school for psychology"
+    },
+    {
+      "fact": "Has a wife named Sarah who is supportive",
+      "category": "relationships",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "My wife Sarah is really supportive"
+    },
+    {
+      "fact": "Has a 7-year-old daughter named Lily",
+      "category": "relationships",
+      "source_convo_id": "conv-12345",
+      "source_timestamp": 1709251200.0,
+      "source_quote": "our daughter Lily, she's 7"
+    }
+  ]
+}
+```
+
+---
+
+## DO THIS (CORRECT)
+
+DO copy the exact words:
+- Original: "I feel anxious about meetings"
+- Quote: "I feel anxious about meetings" (correct)
+
+DO keep quotes short (5-15 words):
+- Original: "I've been meditating daily for about two years now and it's really changed my life"
+- Quote: "meditating daily for about two years" (correct - short anchor)
+
+DO preserve typos:
+- Original: "Rpd wants me to join the team"
+- Quote: "Rpd wants me to join" (correct - keeps typo)
+
+DO preserve informal spelling:
+- Original: "$500 bi weekly until march"
+- Quote: "$500 bi weekly" (correct - keeps space)
+
+DO use the first person:
+- Original: "I struggle with boundaries"
+- Quote: "I struggle with boundaries" (correct - keeps "I")
+
+---
+
+## DON'T DO THIS (WRONG - WILL BE DELETED)
+
+DON'T paraphrase:
+- Original: "I have trouble with boundaries"
+- Wrong: "struggle with setting boundaries" (paraphrased - DELETED)
+
+DON'T use ellipsis to shorten:
+- Original: "My daughter Lily turned 9 last week"
+- Wrong: "My daughter Lily ... last week" (has ellipsis - DELETED)
+
+DON'T fix typos:
+- Original: "Rpd wants me to join"
+- Wrong: "Rod wants me to join" (fixed typo - DELETED)
+
+DON'T clean up grammar:
+- Original: "$500 bi weekly"
+- Wrong: "$500 biweekly" (cleaned up - DELETED)
+
+DON'T replace pronouns:
+- Original: "I feel anxious"
+- Wrong: "The user feels anxious" (replaced "I" - DELETED)
+
+DON'T combine from different messages:
+- Message 1: "I see a therapist"
+- Message 2: "Her name is Dr. Chen"
+- Wrong: "therapist Dr. Chen" (combined - DELETED)
+- Correct: Pick ONE: "I see a therapist" OR "Dr. Chen"
+
+DON'T invent facts not stated:
+- Original: "I might want to start meditating"
+- Wrong: "Practices meditation" (not stated - DELETED)
+
+---
+
+## MORE EXAMPLES BY CATEGORY
+
+### identity examples:
+Input: "I'm a 28-year-old software developer living in Seattle"
+```json
+{
+  "fact": "Is 28 years old",
+  "category": "identity",
+  "source_quote": "28-year-old"
+}
+```
+```json
+{
+  "fact": "Works as a software developer",
+  "category": "identity",
+  "source_quote": "software developer"
+}
+```
+```json
+{
+  "fact": "Lives in Seattle",
+  "category": "identity",
+  "source_quote": "living in Seattle"
+}
+```
+
+### values examples:
+Input: "Family always comes first for me. I would never compromise on that."
+```json
+{
+  "fact": "Prioritizes family above all else",
+  "category": "values",
+  "source_quote": "Family always comes first for me"
+}
+```
+
+### emotions examples:
+Input: "I get really anxious before big presentations. My palms sweat and I can't sleep the night before."
+```json
+{
+  "fact": "Experiences anxiety before presentations including physical symptoms",
+  "category": "emotions",
+  "source_quote": "really anxious before big presentations"
+}
+```
+
+### relationships examples:
+Input: "My mom and I talk every Sunday. We're really close, especially since dad passed."
+```json
+{
+  "fact": "Has a close relationship with mother, talks weekly",
+  "category": "relationships",
+  "source_quote": "My mom and I talk every Sunday"
+}
+```
+```json
+{
+  "fact": "Father has passed away",
+  "category": "history",
+  "source_quote": "since dad passed"
+}
+```
+
+### growth examples:
+Input: "I'm working on being more assertive. It's one of my goals for this year."
+```json
+{
+  "fact": "Working on becoming more assertive",
+  "category": "growth",
+  "source_quote": "working on being more assertive"
+}
+```
+
+### history examples:
+Input: "I grew up in rural Ohio. Small town, everyone knew everyone."
+```json
+{
+  "fact": "Grew up in rural Ohio in a small town",
+  "category": "history",
+  "source_quote": "grew up in rural Ohio"
+}
+```
+
+### practices examples:
+Input: "I've been doing morning pages every day for 6 months. It's really helped my clarity."
+```json
+{
+  "fact": "Has been doing morning pages daily for 6 months",
+  "category": "practices",
+  "source_quote": "morning pages every day for 6 months"
+}
+```
+
+### shadows examples:
+Input: "I notice I get defensive when people give me feedback. It's something I need to work on."
+```json
+{
+  "fact": "Recognizes getting defensive when receiving feedback",
+  "category": "shadows",
+  "source_quote": "I get defensive when people give me feedback"
+}
+```
+
+---
+
+## WHAT TO SKIP
+
+Skip these - they are NOT useful facts:
+- Technical questions ("How do I fix this code?")
+- Project details ("The API returns a 500 error")
+- Transient requests ("Can you help me write an email?")
+- Hypotheticals ("If I were to start a business...")
+- Generic statements ("I like good food" - too vague)
+
+Focus on facts that help understand WHO THIS PERSON IS.
+
+---
+
+## FINAL CHECKLIST
+
+Before returning your JSON, verify:
+
+[ ] Each source_quote is copied EXACTLY from the text (no changes)
+[ ] Each source_quote is 5-15 words (not too long)
+[ ] No source_quote uses "..." (ellipsis)
+[ ] Each fact is about the USER (not the assistant)
+[ ] Each category is one of: identity, values, emotions, relationships, growth, history, practices, shadows
+[ ] Each fact has all 5 required fields
+[ ] The JSON is valid
+
+---
+
+## CONVERSATIONS TO PROCESS

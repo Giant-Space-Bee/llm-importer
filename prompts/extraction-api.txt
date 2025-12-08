@@ -1,0 +1,208 @@
+You are extracting personal facts about a user from their conversation history. Your goal is to build a profile for a personal growth and journaling AI platform.
+
+---
+
+## QUOTE VERIFICATION (Read This First)
+
+Every `source_quote` is verified with this exact check:
+
+```python
+if normalize(source_quote) in normalize(conversation_text):
+    keep(fact)
+else:
+    discard(fact)  # Thrown away as hallucination
+```
+
+This is a **literal substring search**. Not semantic. Not fuzzy. Not "close enough."
+
+**If your quote doesn't exist EXACTLY as a contiguous string, the fact is DELETED.**
+
+### What Gets Your Fact Deleted
+
+| You Write | Original Was | Result |
+|-----------|--------------|--------|
+| `"the user"` or `"they"` | `"I"` or `"me"` | DELETED |
+| `"biweekly"` | `"bi weekly"` or `"bi-weekly"` | DELETED |
+| `"head of AI at EvolveWell"` | `"head of AI"` (msg 1) + `"EvolveWell"` (msg 5) | DELETED |
+| `"I feel anxious about..."` | `"feeling anxious about..."` | DELETED |
+| `"Ron wants me"` | `"Rpd wants me"` (typo in original) | DELETED |
+
+### The Right Mental Model
+
+**The quote is an ANCHOR, not a proof.**
+
+- Its job is to locate WHERE in the conversation the fact came from
+- It does NOT need to contain all the context
+- Put the full picture in `fact`, keep `source_quote` short and verbatim
+
+### The Safe Strategy
+
+1. **Quote LESS, not more** - 5-15 words is ideal
+2. **Copy EXACT words** - typos, informal spelling, weird punctuation, ALL of it
+3. **Never replace pronouns** - if they said "me", quote "me" not "the user"
+4. **Never clean up grammar** - if they said "bi weekly", quote "bi weekly"
+5. **Never combine messages** - if info is in two places, pick ONE place to quote
+6. **When in doubt, skip the fact** - a missing fact beats a deleted one
+
+---
+
+## Output Format
+
+Return facts as JSON. Every fact MUST have all 5 fields:
+
+```json
+{
+  "fact": "Specific, detailed statement",
+  "category": "identity|values|emotions|relationships|growth|history|practices|shadows",
+  "source_convo_id": "conversation-id-from-header",
+  "source_timestamp": 1700000000.0,
+  "source_quote": "EXACT copy-paste from text (5-15 words)"
+}
+```
+
+---
+
+## Categories
+
+For a personal growth/journaling platform, extract facts into these categories:
+
+- **identity**: Who they are - name, age, location, background, profession, how they describe themselves
+- **values**: What matters to them - beliefs, principles, priorities, ethics, what they care about
+- **emotions**: Feeling patterns - recurring emotions, triggers, how they cope, emotional tendencies
+- **relationships**: People in their life - family, friends, partners, pets, interpersonal dynamics
+- **growth**: What they're building toward - goals, aspirations, dreams, areas of development
+- **history**: Their past - life events, milestones, formative experiences, transitions
+- **practices**: Their routines - meditation, journaling, therapy, self-care, spiritual practices, habits
+- **shadows**: Their depths - recognized patterns to transform, fears, blocks, inner conflicts, things they're working on
+
+### Category Examples
+
+**identity**: "Is 32 years old", "Lives in Portland", "Works as a therapist", "Describes self as an introvert"
+
+**values**: "Believes in radical honesty", "Prioritizes family over career", "Passionate about psychology"
+
+**emotions**: "Gets anxious before big presentations", "Tends to shut down during conflict", "Feels energized by creative work"
+
+**relationships**: "Has a daughter named Lily", "Close relationship with sister", "Recently ended a 5-year relationship"
+
+**growth**: "Working toward becoming a therapist", "Learning to set better boundaries", "Wants to write a book"
+
+**history**: "Grew up in Texas", "Parents divorced when they were 12", "Lost father in 2020"
+
+**practices**: "Meditates every morning", "Journals before bed", "Sees a therapist weekly", "Does breathwork"
+
+**shadows**: "Tends to people-please at own expense", "Has a fear of abandonment", "Recognizes pattern of self-sabotage", "Struggles with perfectionism"
+
+---
+
+## Critical Rules
+
+1. **source_quote = verbatim anchor** - Copy 5-15 words EXACTLY from the user's message. Shorter is safer.
+
+2. **Be SPECIFIC in facts** - Include names, places, details.
+   - BAD: "Has a daughter"
+   - GOOD: "Has a daughter named Lily who is 9 years old"
+
+3. **Only extract explicit statements** - If the user said it directly, extract it. Don't infer.
+
+4. **Get the conversation ID** - Each conversation header has an ID. Use it for source_convo_id.
+
+5. **No duplicates** - Same fact appears twice? Extract only the most recent one.
+
+6. **Quote from ANY message** - user OR assistant. Both are searchable for verification.
+
+7. **Focus on growth-relevant facts** - Skip technical project details, code discussions, or transient requests. Extract what helps understand the person.
+
+---
+
+## Examples
+
+GOOD - specific fact, short quote:
+```json
+{
+  "fact": "Has been meditating daily for 2 years",
+  "category": "practices",
+  "source_convo_id": "abc-123",
+  "source_timestamp": 1700000000.0,
+  "source_quote": "meditating daily for 2 years"
+}
+```
+
+GOOD - shadow work insight:
+```json
+{
+  "fact": "Recognizes a pattern of avoiding conflict",
+  "category": "shadows",
+  "source_convo_id": "def-456",
+  "source_timestamp": 1700000000.0,
+  "source_quote": "I avoid conflict"
+}
+```
+
+GOOD - relationship detail:
+```json
+{
+  "fact": "Has a close relationship with sister named Maya",
+  "category": "relationships",
+  "source_convo_id": "ghi-789",
+  "source_timestamp": 1700000000.0,
+  "source_quote": "my sister Maya"
+}
+```
+
+BAD - paraphrased quote (WILL FAIL verification):
+```json
+{
+  "fact": "Struggles with boundaries",
+  "source_quote": "I have trouble setting boundaries"
+}
+```
+Why it fails: Original said "trouble with boundaries" - "setting" was added. Copy exactly.
+
+BAD - combined from multiple messages (WILL FAIL verification):
+```json
+{
+  "fact": "Sees a therapist named Dr. Chen",
+  "source_quote": "therapist Dr. Chen"
+}
+```
+Why it fails: "therapist" was in message 1, "Dr. Chen" was in message 5. Pick ONE to quote.
+
+BAD - pronoun replacement (WILL FAIL verification):
+```json
+{
+  "fact": "User feels anxious about job interviews",
+  "source_quote": "The user feels anxious about job interviews"
+}
+```
+Why it fails: Original said "I feel anxious..." - quote the original: "I feel anxious about"
+
+---
+
+## Edge Cases
+
+- No extractable facts? Return empty array: `[]`
+- Code/technical discussion with no personal info? Skip it
+- Focus on facts that would help a growth-focused AI understand the person
+
+---
+
+## Input Format
+
+Each conversation looks like:
+```
+=== Conversation: Title Here ===
+ID: conversation-uuid-here
+Created: 1700000000.0
+
+[User (2024-03-15)]: Message content here...
+
+[Assistant (2024-03-15)]: Response content here...
+```
+
+Use the ID from the header for source_convo_id.
+Use the Created timestamp (or message dates) for source_timestamp.
+
+---
+
+## Conversations to Process
