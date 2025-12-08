@@ -52,7 +52,7 @@ conversations.json → Parse → Chunk(8192) → Extract(LLM) → Verify → Agg
 |-------|------|------|
 | 0 Free wins | No | Pull `user_editable_context` as baseline profile |
 | 1 Parse | No | Tree → linear messages, filter to user messages |
-| 2 Chunk | No | Split to 65536 token batches, keep convos intact |
+| 2 Chunk | No | Batch by chunk size (default 8192), split oversized convos |
 | 3 Extract | Yes | Get facts[] with source_quote each |
 | 4 Verify | No | String-match source_quote → original; no match = discard |
 | 5 Aggregate | No | Concat verified facts, count frequency |

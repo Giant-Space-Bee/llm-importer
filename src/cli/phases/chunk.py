@@ -20,8 +20,8 @@ DEMO_CHUNK_SIZE = 4096
 def phase_chunk(ctx: PipelineContext) -> PipelineContext:
     """Chunk conversations into processable batches.
 
-    Uses smaller chunk size in demo mode. For API provider, uses quality-first
-    8k chunks and prepares oversized conversations by splitting them.
+    Uses smaller chunk size in demo mode. Both API and local providers
+    split oversized conversations and respect --chunk-size override.
 
     Args:
         ctx: Pipeline context with conversations populated.
@@ -62,8 +62,15 @@ def phase_chunk(ctx: PipelineContext) -> PipelineContext:
                 f"{len(conversations)} (split oversized)"
             )
     else:
-        # Local LLM: use full chunks
-        chunk_size = DEFAULT_CHUNK_SIZE
+        # Local LLM: respect override, split oversized convos
+        chunk_size = ctx.chunk_size_override or DEFAULT_CHUNK_SIZE
+        original_count = len(conversations)
+        conversations = prepare_conversations(conversations, chunk_size)
+        if len(conversations) > original_count:
+            console.print(
+                f"[yellow]Prepared:[/yellow] {original_count} conversations → "
+                f"{len(conversations)} (split oversized)"
+            )
 
     ctx.chunk_size = chunk_size
 
