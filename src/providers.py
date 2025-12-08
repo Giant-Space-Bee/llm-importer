@@ -42,6 +42,9 @@ MAX_CONCURRENT = 5      # Maximum parallel requests
 QUALITY_CHUNK_SIZE = 8192  # Optimal for extraction quality (2^13)
 OUTPUT_ESTIMATE = 3000     # Conservative output estimate for parallelism calc
 
+# Local LLM model configuration
+DEFAULT_LOCAL_MODEL = "lmstudio-community/ministral-3-14b-instruct-2512"
+
 # Retry constants for rate limit handling
 MAX_RETRIES = 3         # Number of retry attempts on rate limit
 INITIAL_BACKOFF = 5     # Initial backoff in seconds (5s, 10s, 20s)
@@ -78,10 +81,12 @@ class LocalProvider(LLMProvider):
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:1234/v1",
-        timeout: float = None  # No timeout for local LLMs - they can take hours on big chunks
+        timeout: float = None,  # No timeout for local LLMs - they can take hours on big chunks
+        model: Optional[str] = None
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.model = model or DEFAULT_LOCAL_MODEL
         self._client = httpx.Client(timeout=timeout)
 
     @property
@@ -97,6 +102,7 @@ class LocalProvider(LLMProvider):
         url = f"{self.base_url}/chat/completions"
 
         payload = {
+            "model": self.model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
@@ -136,6 +142,7 @@ class LocalProvider(LLMProvider):
         url = f"{self.base_url}/chat/completions"
 
         payload = {
+            "model": self.model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
