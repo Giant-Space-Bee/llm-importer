@@ -121,6 +121,20 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 For local LLM mode: Start [LM Studio](https://lmstudio.ai) with a model at `http://127.0.0.1:1234`
 
+### Local LLM Tuning
+
+Environment variables for local LLM inference (tuned for Mistral-family models):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_IMPORTER_REPETITION_PENALTY` | `1.1` | Discourages phrase repetition (1.0=off, 1.2+=aggressive) |
+| `LLM_IMPORTER_TOP_P` | `0.9` | Nucleus sampling threshold (1.0=off, lower=more focused) |
+
+```bash
+# Example: Increase repetition penalty if seeing repeated phrases
+LLM_IMPORTER_REPETITION_PENALTY=1.2 python -m src.main ... --provider local
+```
+
 ## Common Issues
 
 **"File not found"** - Provide full path to `conversations.json`
