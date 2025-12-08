@@ -128,6 +128,29 @@ class LocalProvider(LLMProvider):
 
         raise RuntimeError(f"LLM connection failed after {MAX_RETRIES} attempts: {last_error}")
 
+    def _log_json_error(self, content: str, error: json.JSONDecodeError) -> None:
+        """Dump malformed JSON to error log for debugging."""
+        from datetime import datetime
+        from pathlib import Path
+
+        error_dir = Path("output/json_errors")
+        error_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        error_file = error_dir / f"json_error_{timestamp}.txt"
+
+        with open(error_file, "w") as f:
+            f.write(f"=== JSON Parse Error ===\n")
+            f.write(f"Time: {datetime.now().isoformat()}\n")
+            f.write(f"Error: {error}\n")
+            f.write(f"Position: line {error.lineno}, col {error.colno}, char {error.pos}\n")
+            f.write(f"\n=== Raw Content ({len(content)} chars) ===\n")
+            f.write(content)
+            f.write(f"\n\n=== Context around error (chars {max(0, error.pos-100)}:{error.pos+100}) ===\n")
+            f.write(content[max(0, error.pos-100):error.pos+100])
+
+        print(f"[error] Malformed JSON dumped to: {error_file}", file=sys.stderr)
+
     def complete(self, prompt: str) -> str:
         """
         Call local LLM via OpenAI-compatible API.
@@ -198,6 +221,8 @@ class LocalProvider(LLMProvider):
         try:
             return json.loads(content)
         except json.JSONDecodeError as e:
+            # Dump bad JSON to error log for debugging
+            self._log_json_error(content, e)
             raise RuntimeError(f"LLM returned invalid JSON: {e}")
 
     def __del__(self):
