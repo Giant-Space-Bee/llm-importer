@@ -1,76 +1,67 @@
-# Task: Parser Refactor + ChatGPT Trusted Baseline
+# Task: Refactor phases.py → phases/ Package
 
-## Context
+## What You're Doing
 
-You're working in a worktree (`feature/parser-refactor`) while another Claude works on the deduplicator in the main worktree.
+**Read `docs/refactor-phases-plan.md` first** — it has the full plan with rationale.
 
-**Read CLAUDE.md first** — it has all project context.
+You're splitting a 766-line god file (`src/cli/phases.py`) into a proper package structure. This is a pure refactor — no behavior changes.
 
-## Your Tasks
+## Quick Summary
 
-### Task 1: Refactor parser.py (484 lines → modular)
-
-**Goal:** Split the monolithic `parser.py` into focused modules.
-
-**Target structure:**
+**From:**
 ```
-src/
-├── parser.py              # Facade: parse_all(), detect_export_type()
-└── parsers/
-    ├── __init__.py
-    ├── chatgpt.py         # ChatGPT-specific: flatten_tree, parse_chatgpt_conversations
-    ├── claude.py          # Claude-specific: parse_claude_conversations, _parse_claude_message
-    └── memories.py        # Claude memories: ClaudeMemories, load_claude_memories, format_memories_for_distiller
+src/cli/phases.py  (766 lines, 8 phases + 2 helpers crammed together)
 ```
 
-**Rules:**
-- Keep `parser.py` as the public API (facade pattern)
-- Move format-specific code to submodules
-- Shared types (`Message`, `Conversation`, `UserProfile`) stay in `parser.py`
-- All 186 tests must pass after refactor
-- No behavior changes — pure refactor
-
-**Steps:**
-1. Create `src/parsers/` directory
-2. Move ChatGPT parsing to `parsers/chatgpt.py`
-3. Move Claude parsing to `parsers/claude.py`
-4. Move memories handling to `parsers/memories.py`
-5. Update imports in `parser.py` to re-export from submodules
-6. Run tests, fix any import issues
-7. Commit
-
-### Task 2: ChatGPT user_editable_context as trusted baseline
-
-**Goal:** Pass ChatGPT's custom instructions to the distiller as `trusted_context`, same pattern as Claude memories.
-
-**Current state:**
-- `UserProfile` is parsed in `parser.py:extract_user_profile()`
-- It's displayed in `main.py` but NOT passed to distiller
-- `distiller.py` already has `trusted_context` param (from Claude memories work)
-
-**What to do:**
-1. In `main.py`, after extracting `user_profile`:
-   - Format it as prose for distiller (similar to `format_memories_for_distiller`)
-   - Store as `trusted_context` if no Claude memories exist
-2. Add helper `format_user_profile_for_distiller(profile: UserProfile) -> str`
-3. Priority: Claude memories > ChatGPT user_profile (Claude is richer)
-4. Add tests
-5. Commit
-
-## Commit Style
-
+**To:**
 ```
-Short summary (imperative mood)
+src/cli/phases/
+├── __init__.py          # Re-exports (backward compatible)
+├── _checkpoint.py       # Shared checkpoint builder (DRY)
+├── parse.py
+├── provider.py
+├── chunk.py
+├── resume.py
+├── extract.py           # Biggest one - includes helpers
+├── aggregate.py
+├── deduplicate.py
+├── distill.py
+└── output.py
+```
 
-Longer explanation if needed.
+## Why This Matters
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+1. **DRY:** Checkpoint-saving logic is duplicated 4 times — extract it once
+2. **Isolation:** Test/change one phase without touching others
+3. **Findability:** `phase_parse` → `parse.py` (matches mental model)
 
-Co-Authored-By: Claude <noreply@anthropic.com>
+## Execution Order
+
+The plan has 14 commits. Key sequence:
+
+1. Create `phases/` package structure (no behavior change)
+2. Extract `_checkpoint.py` helper (DRY the 4 duplications)
+3. Move phases one at a time: `aggregate` → `output` → `resume` → `provider` → `chunk` → `parse` → `deduplicate` → `distill` → `extract`
+4. Update `src/cli/__init__.py` exports
+5. Delete old `phases.py`
+6. Update docs
+
+## Rules
+
+- **Run tests after every move** — all must pass
+- **One commit per phase move** — easy rollback
+- **Zero API changes** — existing imports must still work
+- **Preserve docstrings and type hints** — don't simplify
+
+## Tests
+
+```bash
+python -m pytest tests/ -v
 ```
 
 ## When Done
 
-1. Ensure all 186+ tests pass
-2. Commit each task separately
-3. Let user know you're done — they'll merge or review
+1. All tests pass
+2. `src/cli/phases.py` is deleted
+3. Commit history is clean (14 small commits, not 1 giant one)
+4. Let user know — they'll review and merge
