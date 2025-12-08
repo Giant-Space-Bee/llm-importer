@@ -32,6 +32,16 @@ CATEGORIES = ["personal", "professional", "family", "preferences", "interests", 
 
 
 # JSON schema for structured output from LLM
+FACT_WITH_PERIOD = {
+    "type": "object",
+    "properties": {
+        "fact": {"type": "string"},
+        "period": {"type": "string", "description": "Time range or date context, e.g. '2023-2025'"}
+    },
+    "required": ["fact", "period"],
+    "additionalProperties": False,
+}
+
 DISTILL_SCHEMA = {
     "type": "object",
     "properties": {
@@ -42,12 +52,12 @@ DISTILL_SCHEMA = {
         "categories": {
             "type": "object",
             "properties": {
-                "personal": {"type": "array", "items": {"type": "string"}},
-                "professional": {"type": "array", "items": {"type": "string"}},
-                "family": {"type": "array", "items": {"type": "string"}},
-                "preferences": {"type": "array", "items": {"type": "string"}},
-                "interests": {"type": "array", "items": {"type": "string"}},
-                "personality": {"type": "array", "items": {"type": "string"}},
+                "personal": {"type": "array", "items": FACT_WITH_PERIOD},
+                "professional": {"type": "array", "items": FACT_WITH_PERIOD},
+                "family": {"type": "array", "items": FACT_WITH_PERIOD},
+                "preferences": {"type": "array", "items": FACT_WITH_PERIOD},
+                "interests": {"type": "array", "items": FACT_WITH_PERIOD},
+                "personality": {"type": "array", "items": FACT_WITH_PERIOD},
             },
             "required": CATEGORIES,
             "additionalProperties": False,
@@ -64,38 +74,20 @@ class DistilledProfile:
 
     Attributes:
         name: User's name (extracted or 'User')
-        categories: Dict mapping category names to fact lists
+        categories: Dict mapping category names to list of {fact, period} dicts
         generated: ISO timestamp of when profile was created
         source: Description of source data (e.g., "ChatGPT export (450 conversations)")
         fact_count: Number of input facts (for engineering data)
-
-    Example:
-        >>> profile = DistilledProfile(
-        ...     name="Landon",
-        ...     categories={"personal": ["Lives in Victoria, BC"]},
-        ...     generated="2025-12-05T22:00:00",
-        ...     source="ChatGPT export (450 conversations)",
-        ...     fact_count=85
-        ... )
     """
     name: str
-    categories: Dict[str, List[str]]
+    categories: Dict[str, List[Dict[str, str]]]
     generated: str
     source: str
     fact_count: int
 
 
 def load_distill_prompt() -> str:
-    """Load the distillation prompt template from file.
-
-    Returns:
-        Prompt template string.
-
-    Example:
-        >>> template = load_distill_prompt()
-        >>> print(template[:50])
-        'You are creating a memory profile...'
-    """
+    """Load the distillation prompt template from file."""
     prompt_path = Path(__file__).parent.parent / "prompts" / "distill.txt"
     return prompt_path.read_text()
 
@@ -104,27 +96,11 @@ def build_distill_prompt(
     facts: List[DeduplicatedFact],
     trusted_context: Optional[str] = None
 ) -> str:
-    """Build the full distill prompt with facts as JSON.
-
-    If trusted_context is provided, includes it with instructions to
-    preserve existing phrasing and only add new information.
-
-    Args:
-        facts: Deduplicated facts to synthesize into profile.
-        trusted_context: Optional existing profile to merge with.
-
-    Returns:
-        Full prompt string ready for LLM.
-
-    Example:
-        >>> prompt = build_distill_prompt(facts, trusted_context="User lives in BC")
-        >>> "TRUSTED BASELINE" in prompt
-        True
-    """
+    """Build the full distill prompt with facts as JSON."""
     template = load_distill_prompt()
 
     facts_json = json.dumps(
-        [{"fact": f.fact, "category": f.category} for f in facts],
+        [{"fact": f.fact, "category": f.category, "period": f.period} for f in facts],
         indent=2
     )
 
@@ -147,32 +123,7 @@ def distill(
     trusted_context: Optional[str] = None,
     source_info: str = "",
 ) -> DistilledProfile:
-    """Compress deduplicated facts into final memory profile using LLM.
-
-    Takes a list of deduplicated facts and uses the LLM to organize them
-    into a coherent, categorized profile. If trusted_context is provided
-    (from Claude memories or ChatGPT custom instructions), preserves that
-    phrasing and only adds new information.
-
-    Args:
-        facts: Deduplicated facts from the deduplicator stage.
-        provider: LLMProvider for making LLM calls.
-        trusted_context: Optional pre-existing profile prose to merge with.
-        source_info: Description of source data for metadata.
-
-    Returns:
-        DistilledProfile containing organized facts and metadata.
-
-    Raises:
-        RuntimeError: If LLM call fails.
-
-    Example:
-        >>> profile = distill(facts, provider, source_info="ChatGPT (450 convos)")
-        >>> print(profile.name)
-        'Landon'
-        >>> print(len(profile.categories['personal']))
-        15
-    """
+    """Compress deduplicated facts into final memory profile using LLM."""
     if not facts:
         # Return empty profile for empty input
         return DistilledProfile(
@@ -207,18 +158,6 @@ def write_markdown(profile: DistilledProfile, output_dir: Path) -> Path:
     Creates a formatted markdown document with the profile organized
     by category. Includes metadata header with generation timestamp
     and source information.
-
-    Args:
-        profile: The distilled profile to write.
-        output_dir: Directory to write the file to.
-
-    Returns:
-        Path to the written markdown file.
-
-    Example:
-        >>> md_path = write_markdown(profile, Path("output"))
-        >>> print(md_path)
-        output/memory-profile.md
     """
     md_path = output_dir / "memory-profile.md"
 
@@ -230,8 +169,17 @@ def write_markdown(profile: DistilledProfile, output_dir: Path) -> Path:
         facts = profile.categories.get(category, [])
         if facts:
             lines.append(f"## {category.title()}\n\n")
-            for fact in facts:
-                lines.append(f"- {fact}\n")
+            for item in facts:
+                # Handle both dict (new) and string (legacy/fallback)
+                if isinstance(item, dict):
+                    fact_text = item.get("fact", "")
+                    period = item.get("period", "")
+                    if period:
+                        lines.append(f"- {fact_text} *({period})*\n")
+                    else:
+                        lines.append(f"- {fact_text}\n")
+                else:
+                    lines.append(f"- {item}\n")
             lines.append("\n")
 
     md_path.write_text("".join(lines))
@@ -239,23 +187,7 @@ def write_markdown(profile: DistilledProfile, output_dir: Path) -> Path:
 
 
 def write_json(profile: DistilledProfile, output_dir: Path) -> Path:
-    """Write machine-readable JSON profile.
-
-    Creates a JSON file suitable for importing into other AI systems.
-    Structure matches the expected format for memory imports.
-
-    Args:
-        profile: The distilled profile to write.
-        output_dir: Directory to write the file to.
-
-    Returns:
-        Path to the written JSON file.
-
-    Example:
-        >>> json_path = write_json(profile, Path("output"))
-        >>> print(json_path)
-        output/memory-profile.json
-    """
+    """Write machine-readable JSON profile."""
     json_path = output_dir / "memory-profile.json"
 
     data = {

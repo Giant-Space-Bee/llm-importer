@@ -27,6 +27,8 @@ conversations.json
 user.json
 test_*.json
 checkpoints/
+output/
+AGENTS.md
 
 # Environment
 .env

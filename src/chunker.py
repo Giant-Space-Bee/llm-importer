@@ -53,7 +53,13 @@ def format_conversation(convo: Conversation) -> str:
 
     for msg in convo.messages:
         role_label = msg.role.capitalize()
-        lines.append(f"[{role_label}]: {msg.content}")
+        if msg.timestamp:
+            # Format timestamp as YYYY-MM-DD
+            from datetime import datetime
+            date_str = datetime.fromtimestamp(msg.timestamp).strftime('%Y-%m-%d')
+            lines.append(f"[{role_label} ({date_str})]: {msg.content}")
+        else:
+            lines.append(f"[{role_label}]: {msg.content}")
         lines.append("")
 
     return "\n".join(lines)

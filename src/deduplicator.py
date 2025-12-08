@@ -29,11 +29,12 @@ class DeduplicatedFact:
     """
     A deduplicated fact - just fact text and category.
 
-    Provenance info is stripped since we've merged multiple sources.
+    Provenance info is merged. We keep a human-readable period string.
     """
 
     fact: str
     category: str
+    period: str = "" # e.g. "2023", "2021-2024", "Oct 2025"
 
 
 # JSON schema for structured output deduplication
@@ -47,8 +48,9 @@ DEDUP_SCHEMA = {
                 "properties": {
                     "fact": {"type": "string"},
                     "category": {"type": "string", "enum": CATEGORIES},
+                    "period": {"type": "string", "description": "Time range for this fact, e.g. '2023-2025' or 'May 2024'"}
                 },
-                "required": ["fact", "category"],
+                "required": ["fact", "category", "period"],
                 "additionalProperties": False,
             },
         }
@@ -76,6 +78,12 @@ def build_dedup_prompt(
 
     # Convert facts to JSON-serializable format
     facts_json = []
+    from datetime import datetime
+
+    def fmt_ts(ts: float) -> str:
+        # Use full date for precision (YYYY-MM-DD)
+        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+
     for f in facts:
         if isinstance(f, AggregatedFact):
             facts_json.append(
@@ -83,15 +91,16 @@ def build_dedup_prompt(
                     "fact": f.fact.fact,
                     "category": f.fact.category,
                     "frequency": f.frequency,
-                    "source_timestamp": f.fact.source_timestamp,
+                    "period": f"{fmt_ts(f.min_timestamp)} to {fmt_ts(f.max_timestamp)}",
                 }
             )
         else:
-            # DeduplicatedFact - no frequency/timestamp
+            # DeduplicatedFact - already has period string
             facts_json.append(
                 {
                     "fact": f.fact,
                     "category": f.category,
+                    "period": f.period,
                 }
             )
 
@@ -127,6 +136,7 @@ def dedup_batch(
             df = DeduplicatedFact(
                 fact=str(item["fact"]),
                 category=str(item["category"]),
+                period=str(item.get("period", "")),
             )
             deduped.append(df)
         except (KeyError, ValueError, TypeError):

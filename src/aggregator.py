@@ -19,10 +19,12 @@ Fact = Union[Dict[str, Any], ExtractedFact]
 
 @dataclass
 class AggregatedFact:
-    """Fact with frequency count (same fact from multiple chunks = stronger signal)."""
+    """Fact with frequency count and time range."""
 
     fact: ExtractedFact  # The canonical fact (newest instance)
     frequency: int  # How many times this exact fact appeared
+    min_timestamp: float # Earliest occurrence
+    max_timestamp: float # Latest occurrence
 
 
 def get_fact_attr(fact: Fact, attr: str) -> Any:
@@ -47,7 +49,7 @@ def to_extracted_fact(fact: Fact) -> ExtractedFact:
 
 def aggregate(facts: List[Fact]) -> List[AggregatedFact]:
     """
-    Combine all verified facts, count frequency.
+    Combine all verified facts, count frequency, track time range.
 
     Same fact extracted from multiple chunks = higher frequency = stronger signal.
     Used by deduplicator: prefer frequent > rare.
@@ -83,10 +85,20 @@ def aggregate(facts: List[Fact]) -> List[AggregatedFact]:
         # Find newest fact (highest timestamp)
         newest = max(group, key=lambda f: get_fact_attr(f, "source_timestamp"))
 
+        # Calculate time range
+        timestamps = [float(get_fact_attr(f, "source_timestamp")) for f in group]
+        min_ts = min(timestamps)
+        max_ts = max(timestamps)
+
         # Convert to ExtractedFact if needed
         canonical = to_extracted_fact(newest)
 
-        result.append(AggregatedFact(fact=canonical, frequency=frequency))
+        result.append(AggregatedFact(
+            fact=canonical,
+            frequency=frequency,
+            min_timestamp=min_ts,
+            max_timestamp=max_ts
+        ))
 
     return result
 

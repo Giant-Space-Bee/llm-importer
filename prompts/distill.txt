@@ -13,18 +13,23 @@ Return a JSON object with this exact structure:
 {
   "name": "extracted name or 'User'",
   "categories": {
-    "personal": ["fact1", "fact2", ...],
-    "professional": ["fact1", ...],
-    "family": ["fact1", ...],
-    "preferences": ["fact1", ...],
-    "interests": ["fact1", ...],
-    "personality": ["fact1", ...]
+    "personal": [{"fact": "...", "period": "..."}],
+    "professional": [{"fact": "...", "period": "..."}],
+    "family": [{"fact": "...", "period": "..."}],
+    "preferences": [{"fact": "...", "period": "..."}],
+    "interests": [{"fact": "...", "period": "..."}],
+    "personality": [{"fact": "...", "period": "..."}]
   }
 }
 
 Guidelines:
 - Extract the user's name from facts if mentioned, otherwise use "User"
 - COMBINE related facts about the same topic into cohesive sentences
+- **Temporal Reasoning**:
+  - Identify CURRENT vs PAST states based on the "period" field.
+  - Rewrite PAST states in past tense (e.g. "Dated Sara (2008)").
+  - Consolidate timelines (e.g. "Lived in Victoria (2010-2015), then moved to Vancouver").
+  - Do NOT consolidate contradictory facts unless they are clearly a timeline of changes.
 - Order by importance within each category (key facts first)
 - Keep facts concise but complete (full sentences, not fragments)
 - Use natural language that reads well as a profile

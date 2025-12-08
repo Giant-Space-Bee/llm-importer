@@ -9,26 +9,31 @@ Resolution rules (in order of priority):
 3. Higher frequency > rare (check frequency field)
 4. Explicit statement > inference
 
-For each group of duplicates, keep ONE canonical version and discard the others.
+CRITICAL: Distinguish between "Duplicate" and "Update/State Change".
+- DUPLICATE: Same fact, different wording. -> KEEP BEST.
+- STATE CHANGE: Same attribute, different value over time (e.g. "Lives in A" vs "Lives in B", or "Wife is A" vs "Wife is B"). -> KEEP BOTH.
+  - Do NOT discard the older fact if it represents a valid past state.
+  - We want to construct a timeline, so we need the history.
+
+For each group of duplicates, keep ONE canonical version. For state changes, keep ALL versions.
 
 Input format:
 ```json
 [
-  {"fact": "...", "category": "...", "frequency": N, "source_timestamp": ...}
+  {"fact": "...", "category": "...", "frequency": N, "period": "YYYY-MM-DD to YYYY-MM-DD"}
 ]
 ```
 
-Output format - return only unique facts (one per duplicate group):
+Output format - return unique facts (one per duplicate group, multiple for state changes):
 ```json
 [
-  {"fact": "...", "category": "..."}
+  {"fact": "...", "category": "...", "period": "YYYY-MM-DD to YYYY-MM-DD"}
 ]
 ```
 
 Discard:
 - Exact duplicates (keep one)
 - Semantic duplicates (same meaning, different wording - keep best)
-- Contradictions (keep the more recent one)
 - Vague facts when a specific version exists
 
 IMPORTANT: Copy the winning fact verbatim. Do not rewrite or combine facts.
