@@ -13,12 +13,12 @@ Example:
 from src.cli.phases.aggregate import phase_aggregate
 from src.cli.phases.output import phase_output
 from src.cli.phases.resume import phase_check_resume
+from src.cli.phases.provider import phase_select_provider
 
 # Re-export from legacy module during migration
 from src.cli._phases_legacy import (
     DEMO_CHUNK_SIZE,
     phase_parse,
-    phase_select_provider,
     phase_chunk,
     process_sequential_with_checkpoints,
     phase_extract,

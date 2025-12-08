@@ -147,25 +147,6 @@ def phase_parse(ctx: PipelineContext) -> PipelineContext:
     return ctx
 
 
-def phase_select_provider(ctx: PipelineContext, choice: str) -> PipelineContext:
-    """Select and configure the LLM provider.
-
-    Args:
-        ctx: Pipeline context.
-        choice: Provider choice ("local" or "api").
-
-    Returns:
-        Updated context with provider set.
-
-    Example:
-        >>> ctx = phase_select_provider(ctx, "local")
-        >>> print(ctx.provider.is_local)
-        True
-    """
-    ctx.provider = _select_provider(ctx.console, choice)
-    return ctx
-
-
 def phase_chunk(ctx: PipelineContext) -> PipelineContext:
     """Chunk conversations into processable batches.
 
