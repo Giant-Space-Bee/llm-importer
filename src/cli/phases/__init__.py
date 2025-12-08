@@ -1,0 +1,39 @@
+"""
+Pipeline phase functions for the LLM Importer CLI.
+
+This package contains all pipeline phase functions, each in its own module.
+Imports are re-exported here for backward compatibility.
+
+Example:
+    >>> from src.cli.phases import phase_parse, phase_extract
+    >>> ctx = phase_parse(ctx)
+"""
+
+# Re-export from legacy module during migration
+from src.cli._phases_legacy import (
+    DEMO_CHUNK_SIZE,
+    phase_parse,
+    phase_select_provider,
+    phase_chunk,
+    phase_check_resume,
+    process_sequential_with_checkpoints,
+    phase_extract,
+    phase_aggregate,
+    phase_deduplicate,
+    phase_distill,
+    phase_output,
+)
+
+__all__ = [
+    "DEMO_CHUNK_SIZE",
+    "phase_parse",
+    "phase_select_provider",
+    "phase_chunk",
+    "phase_check_resume",
+    "process_sequential_with_checkpoints",
+    "phase_extract",
+    "phase_aggregate",
+    "phase_deduplicate",
+    "phase_distill",
+    "phase_output",
+]
