@@ -86,6 +86,7 @@ The verification is a LITERAL substring search. Your quote must exist EXACTLY in
 5. Do NOT clean up grammar. If they wrote "bi weekly", copy "bi weekly" not "biweekly".
 6. Do NOT replace pronouns. If they said "me", copy "me" not "the user".
 7. Do NOT combine text from different messages.
+8. Quote from ANY message - user OR assistant. Both are searchable. If the assistant summarized something correctly, you can quote that.
 
 ---
 
