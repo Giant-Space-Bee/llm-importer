@@ -53,6 +53,7 @@ from src.cli import (
     check_existing_checkpoint,
     # Phases
     DEMO_CHUNK_SIZE,
+    DEFAULT_CHUNK_SIZE,
     phase_parse,
     phase_select_provider,
     phase_chunk,
@@ -107,6 +108,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Tokens per minute limit for API mode (default: 30000)"
     )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=None,
+        help=f"Override chunk size in tokens (default: {DEFAULT_CHUNK_SIZE})"
+    )
     return parser.parse_args()
 
 
@@ -149,6 +156,7 @@ def main() -> int:
         demo_mode=args.demo,
         resume_mode=args.resume,
         tpm_override=args.tpm,
+        chunk_size_override=args.chunk_size,
     )
     ctx.pipeline_start_time = pipeline_start
 

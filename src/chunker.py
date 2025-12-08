@@ -3,11 +3,12 @@ chunker.py - Smart batching for parallel processing
 
 Stage 3:
 - Count tokens using tiktoken
-- Batch conversations into chunks of max_tokens (default 65536 = 2^16)
+- Batch conversations into chunks of max_tokens
 - Keep conversations intact when possible
 - Split huge conversations at message boundaries
 """
 
+import os
 from typing import List
 from dataclasses import dataclass
 
@@ -15,8 +16,9 @@ import tiktoken
 
 from src.parser import Conversation
 
-# Default chunk size: 2^16 = 65536 (Landon likes powers of 2)
-DEFAULT_CHUNK_SIZE = 65536
+# Default chunk size: configurable via env, fallback to 8192 (2^13)
+_FALLBACK_CHUNK_SIZE = 8192
+DEFAULT_CHUNK_SIZE = int(os.getenv("LLM_IMPORTER_CHUNK_SIZE", _FALLBACK_CHUNK_SIZE))
 
 # Use cl100k_base encoding (GPT-4, Claude-compatible)
 _encoding = tiktoken.get_encoding("cl100k_base")

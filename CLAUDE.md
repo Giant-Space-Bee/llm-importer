@@ -27,11 +27,14 @@ python -m src.main path/to/conversations.json --provider local
 
 # Custom rate limit (tokens per minute)
 python -m src.main path/to/conversations.json --provider api --tpm 40000
+
+# Custom chunk size (env: LLM_IMPORTER_CHUNK_SIZE, default: 8192)
+python -m src.main path/to/conversations.json --provider local --chunk-size 65536
 ```
 
 ## Pipeline
 ```
-conversations.json → Parse → Chunk(65536) → Extract(LLM) → Verify → Aggregate → Dedup(LLM) → Distill(LLM) → Output
+conversations.json → Parse → Chunk(8192) → Extract(LLM) → Verify → Aggregate → Dedup(LLM) → Distill(LLM) → Output
 ```
 
 | Phase | LLM? | What |

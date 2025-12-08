@@ -102,6 +102,7 @@ class PipelineContext:
     demo_mode: bool = False
     resume_mode: bool = False
     tpm_override: Optional[int] = None
+    chunk_size_override: Optional[int] = None
 
     # Phase outputs (populated progressively)
     conversations: List[Conversation] = field(default_factory=list)

@@ -51,12 +51,12 @@ class TestCountTokens:
 
 
 class TestDefaultChunkSize:
-    """Default chunk size should be 2^16 = 65536."""
+    """Default chunk size should be 2^13 = 8192."""
 
     def test_default_is_power_of_two(self):
-        """Landon likes powers of 2."""
-        assert DEFAULT_CHUNK_SIZE == 65536
-        assert DEFAULT_CHUNK_SIZE == 2 ** 16
+        """Still a power of 2, just smaller for reliability."""
+        assert DEFAULT_CHUNK_SIZE == 8192
+        assert DEFAULT_CHUNK_SIZE == 2 ** 13
 
 
 class TestFormatConversation:

@@ -22,6 +22,9 @@ python -m src.main path/to/conversations.json --provider local
 
 # Custom rate limit (tokens per minute) for API
 python -m src.main path/to/conversations.json --provider api --tpm 40000
+
+# Custom chunk size (env: LLM_IMPORTER_CHUNK_SIZE, default: 8192)
+python -m src.main path/to/conversations.json --provider local --chunk-size 65536
 ```
 
 ### CLI Arguments
@@ -33,6 +36,7 @@ python -m src.main path/to/conversations.json --provider api --tpm 40000
 | `--demo` | No | Process only first chunk (4k tokens) for quick testing |
 | `--resume` | No | Continue from checkpoint if interrupted |
 | `--tpm N` | No | Tokens per minute limit for API (default: 20000) |
+| `--chunk-size N` | No | Override chunk size in tokens (default: 8192) |
 
 ## Input Files
 
@@ -62,7 +66,7 @@ python -m src.main ~/Downloads/data-2025-12-03-batch-0000/conversations.json --p
 ## What Happens When You Run It
 
 1. **Parse** - Loads conversations, extracts user messages, finds custom instructions/memories
-2. **Chunk** - Splits into batches (4k demo, 8k API, 65k local)
+2. **Chunk** - Splits into batches (4k demo, 8k default)
 3. **Extract** - LLM extracts facts with source quotes
 4. **Verify** - String-matches quotes against originals (catches hallucinations)
 5. **Aggregate** - Combines verified facts, counts frequency

@@ -188,7 +188,11 @@ def phase_chunk(ctx: PipelineContext) -> PipelineContext:
     show_phase_header(console, 2, "CHUNK")
 
     # Determine chunk size based on mode and provider
-    if ctx.demo_mode:
+    # Priority: chunk_size_override > demo_mode > provider defaults
+    if ctx.chunk_size_override:
+        chunk_size = ctx.chunk_size_override
+        console.print(f"[dim]Using custom chunk size: {chunk_size:,} tokens[/dim]")
+    elif ctx.demo_mode:
         chunk_size = DEMO_CHUNK_SIZE
     elif isinstance(ctx.provider, APIProvider):
         # API mode: use quality-first chunking
@@ -210,7 +214,7 @@ def phase_chunk(ctx: PipelineContext) -> PipelineContext:
                 f"{len(conversations)} (split oversized)"
             )
     else:
-        # Local LLM: use full chunks
+        # Local LLM: use same default as API (8k) for reliability
         chunk_size = DEFAULT_CHUNK_SIZE
 
     ctx.chunk_size = chunk_size

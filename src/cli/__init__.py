@@ -68,6 +68,7 @@ from src.cli.checkpoints import (
 # Phases
 from src.cli.phases import (
     DEMO_CHUNK_SIZE,
+    DEFAULT_CHUNK_SIZE,
     phase_parse,
     phase_select_provider,
     phase_chunk,
