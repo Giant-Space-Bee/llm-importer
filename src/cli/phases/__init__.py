@@ -11,6 +11,7 @@ Example:
 
 # Migrated phases
 from src.cli.phases.aggregate import phase_aggregate
+from src.cli.phases.output import phase_output
 
 # Re-export from legacy module during migration
 from src.cli._phases_legacy import (
@@ -23,7 +24,6 @@ from src.cli._phases_legacy import (
     phase_extract,
     phase_deduplicate,
     phase_distill,
-    phase_output,
 )
 
 __all__ = [
