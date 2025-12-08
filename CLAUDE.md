@@ -32,6 +32,17 @@ python -m src.main path/to/conversations.json --provider api --tpm 40000
 python -m src.main path/to/conversations.json --provider local --chunk-size 65536
 ```
 
+## Environment Variables
+
+All configurable constants. See `docs/magic-numbers.md` for detailed explanations.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_API_KEY` | (required) | API key for Anthropic Claude |
+| `LLM_IMPORTER_CHUNK_SIZE` | 8192 | Tokens per chunk for extraction |
+| `LLM_IMPORTER_TPM` | 30000 | Tokens per minute rate limit |
+| `LLM_IMPORTER_FUZZY_THRESHOLD` | 0.85 | Fuzzy match similarity threshold |
+
 ## Pipeline
 ```
 conversations.json → Parse → Chunk(8192) → Extract(LLM) → Verify → Aggregate → Dedup(LLM) → Distill(LLM) → Output
@@ -109,4 +120,5 @@ After successful run, files are written to `output/`:
 Progress checkpointed after each stage. Use `--resume` to continue interrupted runs.
 
 ## Reference Docs
+- `docs/magic-numbers.md` — All configurable constants with detailed explanations
 - `docs/development-notes.md` — Stage findings, API formats, historical decisions

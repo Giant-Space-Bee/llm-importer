@@ -19,9 +19,7 @@ from typing import List, Union
 from src.aggregator import AggregatedFact, group_by_category
 from src.extractor import CATEGORIES
 from src.providers import LLMProvider
-
-# Default max facts per LLM call
-DEFAULT_MAX_BATCH = 50
+from src.config import DEFAULT_MAX_BATCH
 
 
 @dataclass

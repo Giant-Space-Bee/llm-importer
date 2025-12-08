@@ -18,6 +18,15 @@ from src.chunker import Chunk
 from src.aggregator import AggregatedFact, group_by_category
 from src.deduplicator import DeduplicatedFact
 from src.distiller import DistilledProfile
+from src.config import (
+    USER_PROFILE_PREVIEW_CHARS,
+    CLAUDE_MEMORIES_PREVIEW_CHARS,
+    CHUNK_TABLE_MAX_ROWS,
+    TOP_FACTS_DISPLAY_COUNT,
+    FACT_TRUNCATE_SHORT,
+    FACT_TRUNCATE_MEDIUM,
+    HORIZONTAL_RULE_WIDTH,
+)
 
 
 def get_banner() -> str:
@@ -151,7 +160,7 @@ def show_stats_table(console: Console, stats: ConversationStats) -> None:
 def show_user_profile_preview(
     console: Console,
     user_profile: UserProfile,
-    max_chars: int = 500
+    max_chars: int = USER_PROFILE_PREVIEW_CHARS
 ) -> None:
     """Display a preview of the user profile (custom instructions).
 
@@ -178,7 +187,7 @@ def show_user_profile_preview(
 def show_claude_memories_preview(
     console: Console,
     memories: ClaudeMemories,
-    max_chars: int = 300
+    max_chars: int = CLAUDE_MEMORIES_PREVIEW_CHARS
 ) -> None:
     """Display a preview of Claude memories (trusted baseline).
 
@@ -205,7 +214,7 @@ def show_claude_memories_preview(
 def show_chunk_table(
     console: Console,
     chunks: List[Chunk],
-    max_rows: int = 10
+    max_rows: int = CHUNK_TABLE_MAX_ROWS
 ) -> None:
     """Display chunk breakdown in a formatted table.
 
@@ -284,9 +293,11 @@ def show_results(console: Console, aggregated: List[AggregatedFact]) -> None:
     if aggregated:
         console.print("\n[bold]Top Facts (by frequency):[/bold]")
         sorted_facts = sorted(aggregated, key=lambda f: f.frequency, reverse=True)
-        for f in sorted_facts[:10]:
+        for f in sorted_facts[:TOP_FACTS_DISPLAY_COUNT]:
+            truncated = f.fact.fact[:FACT_TRUNCATE_SHORT]
+            ellipsis = '...' if len(f.fact.fact) > FACT_TRUNCATE_SHORT else ''
             console.print(
-                f"  [{f.fact.category}] {f.fact.fact[:60]}{'...' if len(f.fact.fact) > 60 else ''} "
+                f"  [{f.fact.category}] {truncated}{ellipsis} "
                 f"(x{f.frequency})"
             )
 
@@ -350,8 +361,9 @@ def show_dedup_results(
                 console.print(f"\n  [cyan]{cat.upper()}[/cyan]")
                 for f in cat_facts:
                     # Truncate long facts for display
-                    display_fact = f.fact[:80] + "..." if len(f.fact) > 80 else f.fact
-                    console.print(f"    - {display_fact}")
+                    truncated = f.fact[:FACT_TRUNCATE_MEDIUM]
+                    ellipsis = "..." if len(f.fact) > FACT_TRUNCATE_MEDIUM else ""
+                    console.print(f"    - {truncated}{ellipsis}")
 
 
 def show_final_results(
@@ -404,7 +416,9 @@ def show_final_results(
         if facts:
             console.print(f"  [cyan]{cat.title()}:[/cyan]")
             for f in facts:
-                console.print(f"    - {f[:60]}{'...' if len(f) > 60 else ''}")
+                truncated = f[:FACT_TRUNCATE_SHORT]
+                ellipsis = '...' if len(f) > FACT_TRUNCATE_SHORT else ''
+                console.print(f"    - {truncated}{ellipsis}")
 
 
 def show_phase_header(console: Console, phase_num: int, name: str) -> None:
@@ -425,9 +439,9 @@ def show_phase_header(console: Console, phase_num: int, name: str) -> None:
          PHASE 1: PARSE
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     """
-    console.print(f"\n{'━' * 60}")
+    console.print(f"\n{'━' * HORIZONTAL_RULE_WIDTH}")
     console.print(f" [bold]PHASE {phase_num}: {name}[/bold]")
-    console.print('━' * 60)
+    console.print('━' * HORIZONTAL_RULE_WIDTH)
 
 
 def show_phase_complete(console: Console, elapsed: float) -> None:
@@ -472,9 +486,9 @@ def show_pipeline_summary(
     Example:
         >>> show_pipeline_summary(console, stats, 321, 14, 180, 312, 503.2, Path("output/memory-profile.md"))
     """
-    console.print(f"\n{'━' * 60}")
+    console.print(f"\n{'━' * HORIZONTAL_RULE_WIDTH}")
     console.print(" [bold]SUMMARY[/bold]")
-    console.print('━' * 60)
+    console.print('━' * HORIZONTAL_RULE_WIDTH)
 
     # Input stats
     if stats:

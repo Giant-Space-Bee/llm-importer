@@ -26,25 +26,38 @@ T = TypeVar("T")
 import anthropic
 import httpx
 
-# Provider configuration constants
-DEFAULT_TEMPERATURE = 0.3  # Lower = more deterministic for extraction
-DEFAULT_MAX_TOKENS = 8192  # Plenty of room for extracted facts
-SECONDS_PER_MINUTE = 60
-RATE_LIMIT_BUFFER = 0.1  # Buffer in seconds for rate limit waits
+# Import centralized constants
+from src.config import (
+    # LLM parameters
+    DEFAULT_TEMPERATURE,
+    DEFAULT_MAX_TOKENS,
+    # Rate limiting
+    SECONDS_PER_MINUTE,
+    RATE_LIMIT_BUFFER,
+    DEFAULT_TPM,
+    DEFAULT_RPM,
+    MAX_CONCURRENT_REQUESTS,
+    # Token budgets
+    OUTPUT_RESERVE,
+    OUTPUT_ESTIMATE,
+    # Chunk sizes
+    MIN_CHUNK_SIZE,
+    MAX_CHUNK_SIZE,
+    QUALITY_CHUNK_SIZE,
+    # Retry
+    MAX_RETRIES,
+    INITIAL_BACKOFF_SECONDS,
+    # Local LLM
+    LOCAL_LLM_BASE_URL,
+    LOCAL_LLM_PORT,
+    # Model
+    DEFAULT_MODEL,
+    STRUCTURED_OUTPUTS_BETA,
+)
 
-# TPM-adaptive chunking constants
-OUTPUT_RESERVE = 10000  # Reserved for output tokens (8k output + 2k safety)
-MIN_CHUNK_SIZE = 4096   # Minimum viable chunk size
-MAX_CHUNK_SIZE = 65536  # Default/maximum chunk size (2^16)
-MAX_CONCURRENT = 5      # Maximum parallel requests
-
-# Quality-first chunking constants (Phase 2)
-QUALITY_CHUNK_SIZE = 8192  # Optimal for extraction quality (2^13)
-OUTPUT_ESTIMATE = 3000     # Conservative output estimate for parallelism calc
-
-# Retry constants for rate limit handling
-MAX_RETRIES = 3         # Number of retry attempts on rate limit
-INITIAL_BACKOFF = 5     # Initial backoff in seconds (5s, 10s, 20s)
+# Re-export for backward compatibility
+MAX_CONCURRENT = MAX_CONCURRENT_REQUESTS
+INITIAL_BACKOFF = INITIAL_BACKOFF_SECONDS
 
 
 class LLMProvider(ABC):
@@ -77,7 +90,7 @@ class LocalProvider(LLMProvider):
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:1234/v1",
+        base_url: str = LOCAL_LLM_BASE_URL,
         timeout: float = None  # No timeout for local LLMs - they can take hours on big chunks
     ):
         self.base_url = base_url.rstrip("/")
@@ -187,12 +200,6 @@ class APIProvider(LLMProvider):
     Parallel execution OK with rate limiting (RPM/TPM tracking).
     """
 
-    # Tier 1 defaults
-    DEFAULT_RPM = 5
-    DEFAULT_TPM = 30000
-    DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
-    STRUCTURED_OUTPUTS_BETA = "structured-outputs-2025-11-13"
-
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -207,9 +214,9 @@ class APIProvider(LLMProvider):
                 "API key required. Set ANTHROPIC_API_KEY env var or pass api_key argument."
             )
 
-        self.rpm = rpm if rpm is not None else self.DEFAULT_RPM
-        self.tpm = tpm if tpm is not None else self.DEFAULT_TPM
-        self.model = model or self.DEFAULT_MODEL
+        self.rpm = rpm if rpm is not None else DEFAULT_RPM
+        self.tpm = tpm if tpm is not None else DEFAULT_TPM
+        self.model = model or DEFAULT_MODEL
 
         # Rate limiting state
         self._requests_this_minute = 0
@@ -350,7 +357,7 @@ class APIProvider(LLMProvider):
             response = self._client.beta.messages.create(
                 model=self.model,
                 max_tokens=DEFAULT_MAX_TOKENS,
-                betas=[self.STRUCTURED_OUTPUTS_BETA],
+                betas=[STRUCTURED_OUTPUTS_BETA],
                 messages=[{"role": "user", "content": prompt}],
                 output_format={
                     "type": "json_schema",
@@ -430,4 +437,4 @@ class APIProvider(LLMProvider):
         chunk_size = self.get_safe_chunk_size()
         tokens_per_request = chunk_size + OUTPUT_ESTIMATE  # ~11k per request
         concurrent = max(1, self.tpm // tokens_per_request)
-        return min(concurrent, MAX_CONCURRENT)
+        return min(concurrent, MAX_CONCURRENT_REQUESTS)

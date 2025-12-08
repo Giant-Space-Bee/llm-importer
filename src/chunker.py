@@ -8,17 +8,17 @@ Stage 3:
 - Split huge conversations at message boundaries
 """
 
-import os
 from typing import List
 from dataclasses import dataclass
 
 import tiktoken
 
 from src.parser import Conversation
-
-# Default chunk size: configurable via env, fallback to 8192 (2^13)
-_FALLBACK_CHUNK_SIZE = 8192
-DEFAULT_CHUNK_SIZE = int(os.getenv("LLM_IMPORTER_CHUNK_SIZE", _FALLBACK_CHUNK_SIZE))
+from src.config import (
+    DEFAULT_CHUNK_SIZE,
+    HEADER_OVERHEAD_TOKENS,
+    CHUNK_TRIM_STEP,
+)
 
 # Use cl100k_base encoding (GPT-4, Claude-compatible)
 _encoding = tiktoken.get_encoding("cl100k_base")
@@ -242,8 +242,8 @@ def split_message_text(text: str, max_tokens: int) -> List[str]:
     for i in range(0, len(text), chars_per_chunk):
         chunk = text[i:i + chars_per_chunk]
         # Trim to actual token limit if over
-        while count_tokens(chunk) > max_tokens and len(chunk) > 100:
-            chunk = chunk[:-100]  # Remove 100 chars at a time
+        while count_tokens(chunk) > max_tokens and len(chunk) > CHUNK_TRIM_STEP:
+            chunk = chunk[:-CHUNK_TRIM_STEP]  # Remove chars at a time
         result.append(chunk)
 
     return result
@@ -273,9 +273,7 @@ def split_conversation(
         return [convo]
 
     # Overhead for conversation metadata (title, id, etc.)
-    # Estimate ~50 tokens for header
-    header_overhead = 50
-    effective_max = max_tokens - header_overhead
+    effective_max = max_tokens - HEADER_OVERHEAD_TOKENS
 
     result = []
     current_messages: List[Message] = []

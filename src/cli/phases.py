@@ -19,7 +19,8 @@ from src.parser import (
     format_memories_for_distiller,
     format_user_profile_for_distiller,
 )
-from src.chunker import chunk_conversations, Chunk, DEFAULT_CHUNK_SIZE, prepare_conversations
+from src.chunker import chunk_conversations, Chunk, prepare_conversations
+from src.config import DEFAULT_CHUNK_SIZE, DEMO_CHUNK_SIZE, DUPLICATE_ID_PREVIEW_COUNT
 from src.providers import LLMProvider, APIProvider
 from src.extractor import ExtractedFact
 from src.processor import extract_and_verify_chunk, process_all_chunks, ParallelResult, ChunkResult
@@ -41,10 +42,6 @@ from src.cli.display import (
 from src.cli.validation import find_memories_json
 from src.cli.providers import select_provider as _select_provider
 from src.cli.checkpoints import get_checkpoint_path, check_existing_checkpoint
-
-
-# Demo mode uses smaller chunks for faster testing
-DEMO_CHUNK_SIZE = 4096
 
 
 def phase_parse(ctx: PipelineContext) -> PipelineContext:
@@ -96,8 +93,8 @@ def phase_parse(ctx: PipelineContext) -> PipelineContext:
 
     if duplicate_ids:
         dup_list = sorted(duplicate_ids)  # Deterministic order for testing
-        shown = dup_list[:5]
-        remaining = len(dup_list) - 5
+        shown = dup_list[:DUPLICATE_ID_PREVIEW_COUNT]
+        remaining = len(dup_list) - DUPLICATE_ID_PREVIEW_COUNT
         raise ValueError(
             f"Duplicate conversation IDs found: {shown}"
             + (f" (and {remaining} more)" if remaining > 0 else "")

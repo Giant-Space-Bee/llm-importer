@@ -16,13 +16,18 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 from src.parser import flatten_tree
+from src.config import (
+    FUZZY_MATCH_THRESHOLD,
+    SHORT_QUOTE_LENGTH,
+    SHORT_QUOTE_THRESHOLD,
+    FUZZY_WINDOW_MIN,
+    FUZZY_WINDOW_MARGIN,
+    FUZZY_WINDOW_EXPAND,
+    FUZZY_SEARCH_STEP,
+)
 
 if TYPE_CHECKING:
     from src.extractor import ExtractedFact
-
-# Fuzzy matching threshold (0.0 to 1.0)
-# 0.85 = 85% similar - catches typos like "Rpd" vs "Rod" but rejects paraphrasing
-FUZZY_MATCH_THRESHOLD = 0.85
 
 # Type alias for facts - can be dict or ExtractedFact dataclass
 Fact = Union[Dict[str, Any], "ExtractedFact"]
@@ -330,16 +335,18 @@ def fuzzy_find_in_text(quote: str, text: str, threshold: float = FUZZY_MATCH_THR
         return None
 
     # For short quotes, require higher similarity to avoid false positives
-    if quote_len < 20:
-        threshold = max(threshold, 0.90)
+    if quote_len < SHORT_QUOTE_LENGTH:
+        threshold = max(threshold, SHORT_QUOTE_THRESHOLD)
 
     best_match = None
     best_ratio = threshold  # Only accept matches above threshold
 
     # Sliding window: check windows of varying sizes around quote length
     # This handles cases where quote has extra/missing words
-    for window_size in range(max(10, quote_len - 10), min(text_len + 1, quote_len + 20)):
-        for start in range(0, text_len - window_size + 1, 5):  # Step by 5 for efficiency
+    window_min = max(FUZZY_WINDOW_MIN, quote_len - FUZZY_WINDOW_MARGIN)
+    window_max = min(text_len + 1, quote_len + FUZZY_WINDOW_EXPAND)
+    for window_size in range(window_min, window_max):
+        for start in range(0, text_len - window_size + 1, FUZZY_SEARCH_STEP):
             window = text[start:start + window_size]
             ratio = SequenceMatcher(None, quote, window).ratio()
 

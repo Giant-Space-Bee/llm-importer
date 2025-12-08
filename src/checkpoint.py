@@ -13,6 +13,8 @@ import tempfile
 from pathlib import Path
 from typing import Optional, List, Union
 
+from src.config import FILE_READ_BUFFER_SIZE
+
 
 def hash_file(path: Union[str, Path]) -> str:
     """
@@ -29,7 +31,7 @@ def hash_file(path: Union[str, Path]) -> str:
 
     with open(path, 'rb') as f:
         # Read in chunks to handle large files
-        for chunk in iter(lambda: f.read(8192), b''):
+        for chunk in iter(lambda: f.read(FILE_READ_BUFFER_SIZE), b''):
             sha256.update(chunk)
 
     return f"sha256:{sha256.hexdigest()}"
