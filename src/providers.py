@@ -103,6 +103,31 @@ class LocalProvider(LLMProvider):
     def is_local(self) -> bool:
         return True
 
+    def _make_request(self, url: str, payload: dict) -> dict:
+        """Make request with retry logic and connection reset."""
+        last_error = None
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = self._client.post(url, json=payload)
+                response.raise_for_status()
+                return response.json()
+            except (httpx.RequestError, httpx.HTTPStatusError) as e:
+                last_error = e
+                if attempt < MAX_RETRIES - 1:
+                    # Reset client connection
+                    self._client.close()
+                    self._client = httpx.Client(timeout=self.timeout)
+                    wait_time = INITIAL_BACKOFF_SECONDS * (2 ** attempt)
+                    print(
+                        f"[retry] Connection reset, attempt {attempt + 2}/{MAX_RETRIES} "
+                        f"in {wait_time}s",
+                        file=sys.stderr
+                    )
+                    time.sleep(wait_time)
+
+        raise RuntimeError(f"LLM connection failed after {MAX_RETRIES} attempts: {last_error}")
+
     def complete(self, prompt: str) -> str:
         """
         Call local LLM via OpenAI-compatible API.
@@ -120,23 +145,15 @@ class LocalProvider(LLMProvider):
             "max_tokens": DEFAULT_MAX_TOKENS,
         }
 
-        try:
-            response = self._client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
+        data = self._make_request(url, payload)
 
-            # Extract the response text
-            choices = data.get("choices", [])
-            if not choices:
-                return ""
+        # Extract the response text
+        choices = data.get("choices", [])
+        if not choices:
+            return ""
 
-            message = choices[0].get("message", {})
-            return message.get("content", "")
-
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"LLM API error: {e.response.status_code} - {e.response.text}")
-        except httpx.RequestError as e:
-            raise RuntimeError(f"LLM connection error: {e}")
+        message = choices[0].get("message", {})
+        return message.get("content", "")
 
     def complete_structured(self, prompt: str, schema: dict) -> dict:
         """
@@ -168,25 +185,18 @@ class LocalProvider(LLMProvider):
             }
         }
 
+        data = self._make_request(url, payload)
+
+        choices = data.get("choices", [])
+        if not choices:
+            return {}
+
+        content = choices[0].get("message", {}).get("content", "")
+        if not content:
+            return {}
+
         try:
-            response = self._client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-
-            choices = data.get("choices", [])
-            if not choices:
-                return {}
-
-            content = choices[0].get("message", {}).get("content", "")
-            if not content:
-                return {}
-
             return json.loads(content)
-
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"LLM API error: {e.response.status_code} - {e.response.text}")
-        except httpx.RequestError as e:
-            raise RuntimeError(f"LLM connection error: {e}")
         except json.JSONDecodeError as e:
             raise RuntimeError(f"LLM returned invalid JSON: {e}")
 
