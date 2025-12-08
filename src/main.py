@@ -21,6 +21,8 @@ import time
 
 from rich.console import Console
 
+from src.config import DEFAULT_TPM, LOCAL_LLM_PORT
+
 # Backward-compatible re-exports for tests
 from src.cli import (
     # Types
@@ -106,7 +108,7 @@ def parse_args() -> argparse.Namespace:
         "--tpm",
         type=int,
         default=None,
-        help="Tokens per minute limit for API mode (default: 30000)"
+        help=f"Tokens per minute limit for API mode (default: {DEFAULT_TPM})"
     )
     parser.add_argument(
         "--chunk-size",
@@ -177,7 +179,7 @@ def main() -> int:
     except Exception as e:
         console.print(f"\n[red]Error during processing:[/red] {e}")
         if ctx.provider and ctx.provider.is_local:
-            console.print("[dim]Make sure LM Studio is running at http://127.0.0.1:1234[/dim]")
+            console.print(f"[dim]Make sure LM Studio is running at http://127.0.0.1:{LOCAL_LLM_PORT}[/dim]")
         return 1
 
     # Show pipeline summary

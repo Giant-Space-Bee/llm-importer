@@ -24,6 +24,7 @@ from src.extractor import ExtractedFact
 from src.aggregator import AggregatedFact
 from src.deduplicator import DeduplicatedFact
 from src.distiller import DistilledProfile
+from src.config import MAX_CHUNK_SIZE
 
 
 @dataclass
@@ -113,7 +114,7 @@ class PipelineContext:
     stats: Optional[ConversationStats] = None
     export_type: Optional[ExportType] = None
     provider: Optional[LLMProvider] = None
-    chunk_size: int = 65536
+    chunk_size: int = MAX_CHUNK_SIZE
     max_concurrent: int = 1
     chunks: List[Chunk] = field(default_factory=list)
     remaining_indices: List[int] = field(default_factory=list)
